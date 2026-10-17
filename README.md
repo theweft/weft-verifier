@@ -26,11 +26,12 @@ In classic terms this is weft's *reference monitor* / *policy decision point*.
 |---|---|
 | Delegation | Grants a key a subset of the issuer's rights. Effective rights are the **intersection** along the chain, so a delegation can never widen rights. |
 | Revocation | Trust anchors revoke keys. Permanent (stored in state). |
-| Config fragment | Scoped (`fleet` → `group` → `site` → `device` → `local`), versioned, partial config. Merged with JSON Merge Patch semantics; locks stop other scopes; conflicts are reported. |
-| Deployment | Which artifact (SHA-256) a component runs. Highest scope wins. |
+| Config fragment | Versioned, partial config at a numeric **priority** (higher wins; level names such as fleet/site live in the tenant's scope profile, not here). JSON Merge Patch semantics. **Equal priority, different issuers, incompatible change: neither applies**, a conflict is reported. Locks: only lock owners or holders of `locks.override` may change locked paths. |
+| Deployment | Which artifact (SHA-256) a component runs. Highest priority wins; different artifacts from different issuers at that priority are a conflict and nothing is installed. |
 
 Output: `Install` / `ApplyConfig` instructions, plus accepted, superseded, ignored and rejected
-documents (with reasons), lock conflicts, and components withheld because an accepted document is
+documents (with reasons), conflicts (tie, locked, deployment tie, equivocation; each with a stable
+id, issuers, documents and value hashes), and components withheld because an accepted document is
 missing (fail safe).
 
 ## Formats

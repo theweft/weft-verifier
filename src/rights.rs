@@ -6,59 +6,32 @@
 //! The effective rights of a delegated key are the *intersection* of its issuer's rights and
 //! the rights the delegation declares. Narrowing therefore holds by construction: a delegation
 //! can never grant more than its issuer has, whatever it claims.
+//!
+//! Precedence is a plain number ([`Priority`], higher wins). Names such as "fleet" or "site"
+//! belong to the tenant's scope profile in authoring tools; the verifier never sees them.
 
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     string::String,
 };
 
-/// Configuration scopes, ordered from lowest to highest priority.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Scope {
+/// Precedence of a configuration fragment or deployment. Higher wins.
+pub type Priority = u16;
+
+/// Suggested default scope profile. Tenants may define any other mapping.
+pub mod default_profile {
+    use super::Priority;
+
     /// Whole fleet of a tenant.
-    Fleet,
+    pub const FLEET: Priority = 10;
     /// A group of devices selected by labels.
-    Group,
+    pub const GROUP: Priority = 20;
     /// A site.
-    Site,
+    pub const SITE: Priority = 30;
     /// A single device.
-    Device,
+    pub const DEVICE: Priority = 40;
     /// Changes made on site (technician, local UI).
-    Local,
-}
-
-impl Scope {
-    /// All scopes, lowest priority first.
-    pub const ALL: [Scope; 5] = [
-        Scope::Fleet,
-        Scope::Group,
-        Scope::Site,
-        Scope::Device,
-        Scope::Local,
-    ];
-
-    /// Parses the document representation.
-    pub fn parse(s: &str) -> Option<Scope> {
-        match s {
-            "fleet" => Some(Scope::Fleet),
-            "group" => Some(Scope::Group),
-            "site" => Some(Scope::Site),
-            "device" => Some(Scope::Device),
-            "local" => Some(Scope::Local),
-            _ => None,
-        }
-    }
-
-    /// The document representation.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Scope::Fleet => "fleet",
-            Scope::Group => "group",
-            Scope::Site => "site",
-            Scope::Device => "device",
-            Scope::Local => "local",
-        }
-    }
+    pub const LOCAL: Priority = 50;
 }
 
 /// Things a key may be allowed to do.
@@ -70,11 +43,18 @@ pub enum Action {
     Deploy,
     /// Delegate (a subset of) its own rights to other keys.
     Delegate,
+    /// Change configuration fields locked by other issuers.
+    OverrideLocks,
 }
 
 impl Action {
     /// All actions.
-    pub const ALL: [Action; 3] = [Action::ConfigWrite, Action::Deploy, Action::Delegate];
+    pub const ALL: [Action; 4] = [
+        Action::ConfigWrite,
+        Action::Deploy,
+        Action::Delegate,
+        Action::OverrideLocks,
+    ];
 
     /// Parses the document representation.
     pub fn parse(s: &str) -> Option<Action> {
@@ -82,6 +62,7 @@ impl Action {
             "config.write" => Some(Action::ConfigWrite),
             "deploy" => Some(Action::Deploy),
             "delegate" => Some(Action::Delegate),
+            "locks.override" => Some(Action::OverrideLocks),
             _ => None,
         }
     }
@@ -94,8 +75,10 @@ pub struct Rights {
     pub tenant: String,
     /// Allowed actions.
     pub actions: BTreeSet<Action>,
-    /// Allowed scopes for configuration and deployments.
-    pub scopes: BTreeSet<Scope>,
+    /// Lowest priority the key may sign at (inclusive).
+    pub min_priority: Priority,
+    /// Highest priority the key may sign at (inclusive).
+    pub max_priority: Priority,
     /// Component patterns: `*` (all), `prefix/*`, or an exact component name.
     pub components: BTreeSet<String>,
     /// Required device labels: documents must select at least these labels with these values.
@@ -112,7 +95,8 @@ impl Rights {
         Rights {
             tenant: String::from(tenant),
             actions: Action::ALL.into_iter().collect(),
-            scopes: Scope::ALL.into_iter().collect(),
+            min_priority: Priority::MIN,
+            max_priority: Priority::MAX,
             components: [String::from("*")].into_iter().collect(),
             labels: BTreeMap::new(),
             not_before: 0,
@@ -127,7 +111,8 @@ impl Rights {
         }
         let actions: BTreeSet<Action> =
             self.actions.intersection(&other.actions).copied().collect();
-        let scopes: BTreeSet<Scope> = self.scopes.intersection(&other.scopes).copied().collect();
+        let min_priority = self.min_priority.max(other.min_priority);
+        let max_priority = self.max_priority.min(other.max_priority);
         let mut components = BTreeSet::new();
         for a in &self.components {
             for b in &other.components {
@@ -150,7 +135,7 @@ impl Rights {
         let not_before = self.not_before.max(other.not_before);
         let not_after = self.not_after.min(other.not_after);
         if actions.is_empty()
-            || scopes.is_empty()
+            || min_priority > max_priority
             || components.is_empty()
             || not_before > not_after
         {
@@ -159,7 +144,8 @@ impl Rights {
         Some(Rights {
             tenant: self.tenant.clone(),
             actions,
-            scopes,
+            min_priority,
+            max_priority,
             components,
             labels,
             not_before,
@@ -167,18 +153,18 @@ impl Rights {
         })
     }
 
-    /// Whether these rights allow `action` at `scope` on `component` for a document selecting
-    /// `selector`, at time `now`.
+    /// Whether these rights allow `action` at `priority` on `component` for a document
+    /// selecting `selector`, at time `now`.
     pub fn allows(
         &self,
         action: Action,
-        scope: Scope,
+        priority: Priority,
         component: &str,
         selector: &BTreeMap<String, String>,
         now: u64,
     ) -> bool {
         self.actions.contains(&action)
-            && self.scopes.contains(&scope)
+            && (self.min_priority..=self.max_priority).contains(&priority)
             && self
                 .components
                 .iter()

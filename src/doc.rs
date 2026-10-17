@@ -15,7 +15,7 @@ use alloc::{
 use crate::{
     cbor::Value,
     crypto::{Algorithm, KeyId, PublicKey},
-    rights::{Action, Rights, Scope, pattern_is_valid},
+    rights::{Action, Priority, Rights, pattern_is_valid},
 };
 
 /// Document format version understood by this verifier.
@@ -50,7 +50,7 @@ pub enum Doc {
         target: Target,
         /// Partial configuration values (a map; JSON Merge Patch semantics).
         values: Value,
-        /// Paths that no other scope may change.
+        /// Paths that only the lock owners (or holders of the lock-override right) may change.
         locks: BTreeSet<Vec<String>>,
     },
     /// Which artifact a component should run.
@@ -74,13 +74,13 @@ pub enum Doc {
 /// Targeting and versioning shared by config fragments and deployments.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Target {
-    /// Scope of the issuer's change.
-    pub scope: Scope,
+    /// Precedence of the change (higher wins; names live in the tenant's scope profile).
+    pub priority: Priority,
     /// Component the document applies to.
     pub component: String,
     /// Devices must carry all these labels.
     pub selector: BTreeMap<String, String>,
-    /// Monotonic version per (kind, scope, issuer, component).
+    /// Monotonic version per (kind, priority, issuer, component).
     pub version: u64,
 }
 
@@ -187,7 +187,7 @@ pub fn parse(value: &Value) -> Result<Doc, DocError> {
 }
 
 fn target(obj: &mut Obj<'_>) -> Result<Target, DocError> {
-    let scope = Scope::parse(&text(obj.req("scope")?)?).ok_or(DocError::Invalid)?;
+    let priority = priority(obj.req("priority")?)?;
     let component = non_empty(text(obj.req("component")?)?)?;
     if component.contains('*') {
         return Err(DocError::Invalid);
@@ -198,7 +198,7 @@ fn target(obj: &mut Obj<'_>) -> Result<Target, DocError> {
     };
     let version = uint(obj.req("version")?)?;
     Ok(Target {
-        scope,
+        priority,
         component,
         selector,
         version,
@@ -220,10 +220,13 @@ fn rights(value: &Value, tenant: &str) -> Result<Rights, DocError> {
         .iter()
         .map(|v| Action::parse(&text(v)?).ok_or(DocError::Invalid))
         .collect::<Result<BTreeSet<_>, _>>()?;
-    let scopes = array(obj.req("scopes")?)?
-        .iter()
-        .map(|v| Scope::parse(&text(v)?).ok_or(DocError::Invalid))
-        .collect::<Result<BTreeSet<_>, _>>()?;
+    let [min_priority, max_priority] = array(obj.req("priorities")?)? else {
+        return Err(DocError::Invalid);
+    };
+    let (min_priority, max_priority) = (priority(min_priority)?, priority(max_priority)?);
+    if min_priority > max_priority {
+        return Err(DocError::Invalid);
+    }
     let components = array(obj.req("components")?)?
         .iter()
         .map(|v| {
@@ -245,7 +248,8 @@ fn rights(value: &Value, tenant: &str) -> Result<Rights, DocError> {
     Ok(Rights {
         tenant: String::from(tenant),
         actions,
-        scopes,
+        min_priority,
+        max_priority,
         components,
         labels,
         not_before,
@@ -283,6 +287,10 @@ fn non_empty(s: String) -> Result<String, DocError> {
 fn uint(value: &Value) -> Result<u64, DocError> {
     let i = value.as_int().ok_or(DocError::Type)?;
     u64::try_from(i).map_err(|_| DocError::Invalid)
+}
+
+fn priority(value: &Value) -> Result<Priority, DocError> {
+    Priority::try_from(uint(value)?).map_err(|_| DocError::Invalid)
 }
 
 fn array(value: &Value) -> Result<&[Value], DocError> {

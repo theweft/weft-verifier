@@ -23,6 +23,19 @@ use weft_verifier::{
 };
 
 pub const TENANT: &str = "acme";
+
+/// Default scope profile names to priorities (authoring tools do this, not the verifier).
+pub fn prio(name: &str) -> i64 {
+    use weft_verifier::rights::default_profile as p;
+    i64::from(match name {
+        "fleet" => p::FLEET,
+        "group" => p::GROUP,
+        "site" => p::SITE,
+        "device" => p::DEVICE,
+        "local" => p::LOCAL,
+        other => other.parse().expect("scope name or number"),
+    })
+}
 pub const NOW: u64 = 1_800_000_000;
 
 pub struct Key {
@@ -81,7 +94,7 @@ impl Default for Grant<'_> {
     fn default() -> Self {
         Grant {
             actions: &["config.write", "deploy", "delegate"],
-            scopes: &["fleet", "group", "site", "device", "local"],
+            scopes: &["0", "65535"],
             components: &["*"],
             labels: &[],
             not_before: 0,
@@ -107,7 +120,13 @@ pub fn delegation(subject: &Key, grant: &Grant<'_>) -> Value {
             "rights",
             Value::map([
                 ("actions", texts(grant.actions)),
-                ("scopes", texts(grant.scopes)),
+                (
+                    "priorities",
+                    Value::Array(vec![
+                        Value::Int(grant.scopes.iter().map(|s| prio(s)).min().unwrap()),
+                        Value::Int(grant.scopes.iter().map(|s| prio(s)).max().unwrap()),
+                    ]),
+                ),
                 ("components", texts(grant.components)),
                 ("labels", labels(grant.labels)),
                 (
@@ -139,7 +158,7 @@ pub fn config(f: &Frag<'_>) -> Value {
         ("type", Value::text("config")),
         ("tenant", Value::text(TENANT)),
         ("issued_at", Value::Int(1)),
-        ("scope", Value::text(f.scope)),
+        ("priority", Value::Int(prio(f.scope))),
         ("component", Value::text(f.component)),
         ("selector", labels(f.selector)),
         ("version", Value::Int(f.version)),
@@ -154,7 +173,7 @@ pub fn deployment(scope: &str, component: &str, version: i64, artifact: [u8; 32]
         ("type", Value::text("deployment")),
         ("tenant", Value::text(TENANT)),
         ("issued_at", Value::Int(1)),
-        ("scope", Value::text(scope)),
+        ("priority", Value::Int(prio(scope))),
         ("component", Value::text(component)),
         ("version", Value::Int(version)),
         ("artifact", Value::Bytes(artifact.to_vec())),

@@ -22,7 +22,8 @@ use common::{
 use weft_verifier::{
     Decisions, DeviceFacts, Instruction, Reason, TrustAnchor, VerifierState,
     cbor::{self, Limits, Value},
-    rights::Scope,
+    resolve::ConflictKind,
+    rights::default_profile,
     step,
 };
 
@@ -276,8 +277,10 @@ fn expired_delegation_is_reported_as_expired() {
 }
 
 #[test]
-fn locks_block_other_scopes_and_report_conflicts() {
+fn locks_block_other_issuers_and_report_conflicts() {
     let root = key(1);
+    let site_admin = key(2);
+    let deleg = sign(&root, &delegation(&site_admin, &Grant::default()));
     let fleet = sign(
         &root,
         &config(&Frag {
@@ -294,7 +297,7 @@ fn locks_block_other_scopes_and_report_conflicts() {
         }),
     );
     let site = sign(
-        &root,
+        &site_admin,
         &config(&frag(
             "site",
             "app",
@@ -309,7 +312,7 @@ fn locks_block_other_scopes_and_report_conflicts() {
         &VerifierState::default(),
         &[anchor(&root)],
         &facts(&[]),
-        &[site, fleet],
+        &[deleg, site.clone(), fleet.clone()],
     );
     assert_eq!(
         applied_config(&d, "app"),
@@ -320,8 +323,310 @@ fn locks_block_other_scopes_and_report_conflicts() {
     );
     assert_eq!(d.conflicts.len(), 1);
     let c = &d.conflicts[0];
+    assert_eq!(c.kind, ConflictKind::Locked);
     assert_eq!(c.path, vec!["alarm".to_string(), "threshold".to_string()]);
-    assert_eq!((c.scope, c.locked_by), (Scope::Site, Scope::Fleet));
+    assert_eq!(c.priority, default_profile::SITE);
+    assert_eq!(c.issuers.len(), 2);
+    assert_eq!(c.documents, sorted(&[digest(&site), digest(&fleet)]));
+}
+
+#[test]
+fn lock_owner_and_lock_override_right_may_change_locked_fields() {
+    let root = key(1);
+    let auditor = key(2);
+    let locked = sign(
+        &root,
+        &config(&Frag {
+            locks: &[&["limit"]],
+            ..frag("fleet", "app", 1, Value::map([("limit", Value::Int(1))]))
+        }),
+    );
+    // The lock owner itself may change the value at a higher priority.
+    let owner_change = sign(
+        &root,
+        &config(&frag(
+            "site",
+            "app",
+            1,
+            Value::map([("limit", Value::Int(2))]),
+        )),
+    );
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &[locked.clone(), owner_change],
+    );
+    assert_eq!(
+        applied_config(&d, "app"),
+        Some(Value::map([("limit", Value::Int(2))]))
+    );
+    assert!(d.conflicts.is_empty());
+
+    // Another issuer needs the explicit lock-override right.
+    let deleg = sign(
+        &root,
+        &delegation(
+            &auditor,
+            &Grant {
+                actions: &["config.write", "locks.override"],
+                ..Grant::default()
+            },
+        ),
+    );
+    let override_change = sign(
+        &auditor,
+        &config(&frag(
+            "device",
+            "app",
+            1,
+            Value::map([("limit", Value::Int(3))]),
+        )),
+    );
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &[locked, deleg, override_change],
+    );
+    assert_eq!(
+        applied_config(&d, "app"),
+        Some(Value::map([("limit", Value::Int(3))]))
+    );
+    assert!(d.conflicts.is_empty());
+}
+
+#[test]
+fn equal_priority_tie_applies_neither_change() {
+    let root = key(1);
+    let a = key(2);
+    let b = key(3);
+    let delegs = [
+        sign(&root, &delegation(&a, &Grant::default())),
+        sign(&root, &delegation(&b, &Grant::default())),
+    ];
+    let fleet = sign(
+        &root,
+        &config(&frag(
+            "fleet",
+            "app",
+            1,
+            Value::map([("rate", Value::Int(1))]),
+        )),
+    );
+    let from_a = sign(
+        &a,
+        &config(&frag(
+            "site",
+            "app",
+            1,
+            Value::map([("rate", Value::Int(2)), ("only_a", Value::Int(7))]),
+        )),
+    );
+    let from_b = sign(
+        &b,
+        &config(&frag(
+            "site",
+            "app",
+            1,
+            Value::map([("rate", Value::Int(3)), ("same", Value::Int(5))]),
+        )),
+    );
+    let from_b_same = sign(
+        &b,
+        &config(&frag(
+            "group",
+            "app",
+            1,
+            Value::map([("same", Value::Int(5))]),
+        )),
+    );
+    let from_a_same = sign(
+        &a,
+        &config(&frag(
+            "group",
+            "app",
+            1,
+            Value::map([("same", Value::Int(5))]),
+        )),
+    );
+    let mut inputs = delegs.to_vec();
+    inputs.extend([
+        fleet,
+        from_a.clone(),
+        from_b.clone(),
+        from_a_same,
+        from_b_same,
+    ]);
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &inputs,
+    );
+    // `rate` keeps the lower-priority value; non-conflicting fields still apply.
+    assert_eq!(
+        applied_config(&d, "app"),
+        Some(Value::map([
+            ("rate", Value::Int(1)),
+            ("only_a", Value::Int(7)),
+            ("same", Value::Int(5)),
+        ]))
+    );
+    assert_eq!(d.conflicts.len(), 1);
+    let c = &d.conflicts[0];
+    assert_eq!(c.kind, ConflictKind::Tie);
+    assert_eq!(c.path, vec!["rate".to_string()]);
+    assert_eq!(c.priority, default_profile::SITE);
+    assert_eq!(c.issuers, sorted_ids(&[a.pk.key_id(), b.pk.key_id()]));
+    assert_eq!(c.documents, sorted(&[digest(&from_a), digest(&from_b)]));
+    assert_eq!(c.values.len(), 2);
+}
+
+#[test]
+fn structural_tie_between_value_and_subtree() {
+    let root = key(1);
+    let a = key(2);
+    let b = key(3);
+    let mut inputs = vec![
+        sign(&root, &delegation(&a, &Grant::default())),
+        sign(&root, &delegation(&b, &Grant::default())),
+    ];
+    inputs.push(sign(
+        &a,
+        &config(&frag(
+            "site",
+            "app",
+            1,
+            Value::map([("alarm", Value::Int(5))]),
+        )),
+    ));
+    inputs.push(sign(
+        &b,
+        &config(&frag(
+            "site",
+            "app",
+            1,
+            Value::map([("alarm", Value::map([("threshold", Value::Int(85))]))]),
+        )),
+    ));
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &inputs,
+    );
+    assert_eq!(applied_config(&d, "app"), Some(Value::map([])));
+    assert_eq!(d.conflicts.len(), 1);
+    assert_eq!(d.conflicts[0].path, vec!["alarm".to_string()]);
+}
+
+#[test]
+fn tenant_profile_decides_cross_cutting_precedence() {
+    // The tenant's profile puts "model" at 25 (between group and site): site overrides model.
+    let root = key(1);
+    let model = sign(
+        &root,
+        &config(&Frag {
+            selector: &[("model", "x")],
+            ..frag("25", "app", 1, Value::map([("rate", Value::Int(1))]))
+        }),
+    );
+    let site = sign(
+        &root,
+        &config(&Frag {
+            selector: &[("site", "vienna")],
+            ..frag("site", "app", 1, Value::map([("rate", Value::Int(2))]))
+        }),
+    );
+    let device = facts(&[("model", "x"), ("site", "vienna")]);
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &device,
+        &[model, site],
+    );
+    assert_eq!(
+        applied_config(&d, "app"),
+        Some(Value::map([("rate", Value::Int(2))]))
+    );
+}
+
+#[test]
+fn deployment_tie_installs_nothing_and_same_artifact_is_fine() {
+    let root = key(1);
+    let a = key(2);
+    let b = key(3);
+    let delegs = vec![
+        sign(&root, &delegation(&a, &Grant::default())),
+        sign(&root, &delegation(&b, &Grant::default())),
+    ];
+    let lower = sign(&root, &deployment("fleet", "os", 1, [1; 32]));
+    let from_a = sign(&a, &deployment("site", "os", 1, [2; 32]));
+    let from_b = sign(&b, &deployment("site", "os", 1, [3; 32]));
+    let mut inputs = delegs.clone();
+    inputs.extend([lower.clone(), from_a.clone(), from_b]);
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &inputs,
+    );
+    assert!(d.actions.is_empty());
+    assert_eq!(d.conflicts.len(), 1);
+    assert_eq!(d.conflicts[0].kind, ConflictKind::DeploymentTie);
+    assert_eq!(d.conflicts[0].values, sorted(&[[2; 32], [3; 32]]));
+
+    let from_b_same = sign(&b, &deployment("site", "os", 2, [2; 32]));
+    let mut inputs = delegs;
+    inputs.extend([lower, from_a, from_b_same]);
+    let (_, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &inputs,
+    );
+    assert_eq!(
+        d.actions,
+        vec![Instruction::Install {
+            component: "os".into(),
+            artifact: [2; 32]
+        }]
+    );
+    assert!(d.conflicts.is_empty());
+}
+
+#[test]
+fn conflict_ids_are_stable_across_devices() {
+    let root = key(1);
+    let a = key(2);
+    let b = key(3);
+    let inputs = vec![
+        sign(&root, &delegation(&a, &Grant::default())),
+        sign(&root, &delegation(&b, &Grant::default())),
+        sign(
+            &a,
+            &config(&frag("site", "app", 1, Value::map([("x", Value::Int(1))]))),
+        ),
+        sign(
+            &b,
+            &config(&frag("site", "app", 1, Value::map([("x", Value::Int(2))]))),
+        ),
+    ];
+    let (_, d1) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[("n", "1")]),
+        &inputs,
+    );
+    let (_, d2) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[("n", "2")]),
+        &inputs,
+    );
+    assert_eq!(d1.conflicts.len(), 1);
+    assert_eq!(d1.conflicts[0].id, d2.conflicts[0].id);
 }
 
 #[test]
@@ -429,6 +734,9 @@ fn equivocation_is_rejected() {
     assert_eq!(reason_of(&d, &a), Some(Reason::Equivocation));
     assert_eq!(reason_of(&d, &b), Some(Reason::Equivocation));
     assert_eq!(d.withheld, vec!["app".to_string()]);
+    assert_eq!(d.conflicts.len(), 1);
+    assert_eq!(d.conflicts[0].kind, ConflictKind::Equivocation);
+    assert_eq!(d.conflicts[0].documents, sorted(&[digest(&a), digest(&b)]));
 }
 
 #[test]
@@ -622,6 +930,18 @@ fn result_is_independent_of_input_order() {
         count += 1;
     });
     assert_eq!(count, 120);
+}
+
+fn sorted(items: &[[u8; 32]]) -> Vec<[u8; 32]> {
+    let mut v = items.to_vec();
+    v.sort_unstable();
+    v
+}
+
+fn sorted_ids(items: &[[u8; 16]]) -> Vec<[u8; 16]> {
+    let mut v = items.to_vec();
+    v.sort_unstable();
+    v
 }
 
 fn permute(items: &mut Vec<usize>, k: usize, f: &mut dyn FnMut(&[usize])) {

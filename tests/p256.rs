@@ -26,7 +26,7 @@ fn deployment() -> Value {
         ("type", Value::text("deployment")),
         ("tenant", Value::text("acme")),
         ("issued_at", Value::Int(1)),
-        ("scope", Value::text("fleet")),
+        ("priority", Value::Int(10)),
         ("component", Value::text("os")),
         ("version", Value::Int(1)),
         ("artifact", Value::Bytes(vec![3; 32])),

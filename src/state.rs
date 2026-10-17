@@ -10,7 +10,7 @@ use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use crate::{
     VerifierState,
     cbor::{self, CborError, Limits, Value},
-    rights::Scope,
+    rights::Priority,
     verifier::{Kind, Mark, Slot},
 };
 
@@ -54,7 +54,7 @@ impl VerifierState {
                         Kind::Config => "config",
                         Kind::Deployment => "deployment",
                     }),
-                    Value::text(slot.scope.as_str()),
+                    Value::Int(i64::from(slot.priority)),
                     Value::Bytes(slot.issuer.to_vec()),
                     Value::Text(slot.component.clone()),
                     Value::Int(i64::try_from(mark.version).unwrap_or(i64::MAX)),
@@ -102,7 +102,7 @@ impl VerifierState {
             .and_then(Value::as_array)
             .ok_or(StateError::Format)?
         {
-            let [kind, scope, issuer, component, version, digest] =
+            let [kind, priority, issuer, component, version, digest] =
                 item.as_array().ok_or(StateError::Format)?
             else {
                 return Err(StateError::Format);
@@ -112,9 +112,9 @@ impl VerifierState {
                 Some("deployment") => Kind::Deployment,
                 _ => return Err(StateError::Format),
             };
-            let scope = scope
-                .as_text()
-                .and_then(Scope::parse)
+            let priority = priority
+                .as_int()
+                .and_then(|i| Priority::try_from(i).ok())
                 .ok_or(StateError::Format)?;
             let issuer = bytes_n::<16>(issuer)?;
             let component = String::from(component.as_text().ok_or(StateError::Format)?);
@@ -126,7 +126,7 @@ impl VerifierState {
             marks.insert(
                 Slot {
                     kind,
-                    scope,
+                    priority,
                     issuer,
                     component,
                 },

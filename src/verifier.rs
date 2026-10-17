@@ -11,12 +11,12 @@ use alloc::{
 use core::cmp::Reverse;
 
 use crate::{
-    cbor::{self, Limits, Value},
+    cbor::{self, Limits},
     cose::Sign1,
     crypto::{KeyId, PublicKey, sha256},
     doc::{self, Doc, Target},
-    resolve::{Conflict, Locks, Merge},
-    rights::{Action, Rights, Scope},
+    resolve::{Conflict, ConflictKind, Fragment, resolve},
+    rights::{Action, Priority, Rights},
 };
 
 /// Maximum delegation chain length below a trust anchor.
@@ -57,13 +57,13 @@ pub enum Kind {
     Deployment,
 }
 
-/// One versioned stream of documents: (kind, scope, issuer, component).
+/// One versioned stream of documents: (kind, priority, issuer, component).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Slot {
     /// Document kind.
     pub kind: Kind,
-    /// Issuer's scope.
-    pub scope: Scope,
+    /// Priority the documents are signed at.
+    pub priority: Priority,
     /// Issuer's key id.
     pub issuer: KeyId,
     /// Target component.
@@ -156,7 +156,8 @@ pub struct Decisions {
     pub ignored: Vec<[u8; 32]>,
     /// Rejected inputs, sorted.
     pub rejected: Vec<Rejection>,
-    /// Changes blocked by locks, sorted.
+    /// Conflicts (ties, blocked lock changes, deployment ties, equivocation), sorted. Surface
+    /// these in reported state and events; [`Conflict::id`] is stable across devices.
     pub conflicts: Vec<Conflict>,
     /// Components without actions because a previously accepted document is missing from the
     /// input (fail safe: no decision on incomplete information), sorted.
@@ -173,6 +174,8 @@ struct Candidate<'a> {
     input: &'a Input,
     issuer: KeyId,
     target: &'a Target,
+    /// Whether the issuer may change paths locked by others (for this document).
+    may_override_locks: bool,
 }
 
 type Keys = BTreeMap<KeyId, (PublicKey, Vec<Rights>)>;
@@ -197,6 +200,20 @@ impl Ctx<'_> {
 
     fn reject(&mut self, digest: [u8; 32], reason: Reason) {
         self.out.rejected.push(Rejection { digest, reason });
+    }
+
+    /// Records an equivocation: the component is withheld until the issuer fixes it.
+    fn equivocation(&mut self, slot: &Slot, documents: impl IntoIterator<Item = [u8; 32]>) {
+        self.out.conflicts.push(Conflict::new(
+            ConflictKind::Equivocation,
+            &slot.component,
+            Vec::new(),
+            slot.priority,
+            [slot.issuer],
+            documents,
+            [],
+        ));
+        self.withheld.insert(slot.component.clone());
     }
 }
 
@@ -403,11 +420,11 @@ fn authorize_documents<'a>(
             ctx.reject(input.digest, Reason::BadSignature);
             continue;
         }
-        let (scope, component) = (target.scope, target.component.as_str());
+        let (priority, component) = (target.priority, target.component.as_str());
         let allowed_at = |t: &dyn Fn(&Rights) -> u64| {
             rights
                 .iter()
-                .any(|r| r.allows(action, scope, component, &target.selector, t(r)))
+                .any(|r| r.allows(action, priority, component, &target.selector, t(r)))
         };
         if !allowed_at(&|_| ctx.now) {
             let reason = if allowed_at(&|r| r.not_before) {
@@ -426,9 +443,18 @@ fn authorize_documents<'a>(
             ctx.out.ignored.push(input.digest);
             continue;
         }
+        let may_override_locks = rights.iter().any(|r| {
+            r.allows(
+                Action::OverrideLocks,
+                priority,
+                component,
+                &target.selector,
+                ctx.now,
+            )
+        });
         let slot = Slot {
             kind,
-            scope,
+            priority,
             issuer,
             component: target.component.clone(),
         };
@@ -436,6 +462,7 @@ fn authorize_documents<'a>(
             input,
             issuer,
             target,
+            may_override_locks,
         });
     }
     slots
@@ -463,16 +490,16 @@ fn select_winners<'a>(
         if equivocation {
             // Two different documents with one version: the issuer equivocates.
             ctx.reject(best.input.digest, Reason::Equivocation);
-            for digest in same_version {
-                ctx.reject(digest, Reason::Equivocation);
+            for digest in &same_version {
+                ctx.reject(*digest, Reason::Equivocation);
             }
-            ctx.withheld.insert(slot.component.clone());
+            ctx.equivocation(&slot, same_version.into_iter().chain([best.input.digest]));
         } else {
             match mark {
                 Some(m) if version < m.version => ctx.reject(best.input.digest, Reason::Rollback),
                 Some(m) if version == m.version && best.input.digest != m.digest => {
                     ctx.reject(best.input.digest, Reason::Equivocation);
-                    ctx.withheld.insert(slot.component.clone());
+                    ctx.equivocation(&slot, [best.input.digest, m.digest]);
                 }
                 _ => {
                     ctx.next.marks.insert(
@@ -499,81 +526,78 @@ fn select_winners<'a>(
     winners
 }
 
-/// 6a. Deployments: highest scope wins, then highest version, then lowest issuer id.
+/// 6a. Deployments: the highest priority wins. Different artifacts from different issuers at
+/// that priority are a conflict: nothing is installed and the current version keeps running.
 fn plan_deployments(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
-    let mut by_component: BTreeMap<&str, Vec<&Candidate<'_>>> = BTreeMap::new();
-    for w in winners
-        .iter()
-        .filter(|w| matches!(w.input.doc, Doc::Deployment { .. }))
-    {
-        by_component
-            .entry(w.target.component.as_str())
-            .or_default()
-            .push(w);
+    let mut by_component: BTreeMap<&str, Vec<(&Candidate<'_>, [u8; 32])>> = BTreeMap::new();
+    for w in winners {
+        if let Doc::Deployment { artifact, .. } = &w.input.doc {
+            by_component
+                .entry(w.target.component.as_str())
+                .or_default()
+                .push((w, *artifact));
+        }
     }
     for (component, docs) in by_component {
         if ctx.withheld.contains(component) {
             continue;
         }
-        let best = docs
-            .into_iter()
-            .max_by_key(|c| (c.target.scope, c.target.version, Reverse(c.issuer)));
-        if let Some(Candidate {
-            input:
-                Input {
-                    doc: Doc::Deployment { artifact, .. },
-                    ..
-                },
-            ..
-        }) = best
-            && ctx.facts.installed.get(component) != Some(artifact)
-        {
-            ctx.out.actions.push(Instruction::Install {
-                component: String::from(component),
-                artifact: *artifact,
-            });
+        let Some(top) = docs.iter().map(|(c, _)| c.target.priority).max() else {
+            continue;
+        };
+        let at_top: Vec<&(&Candidate<'_>, [u8; 32])> = docs
+            .iter()
+            .filter(|(c, _)| c.target.priority == top)
+            .collect();
+        let artifacts: BTreeSet<[u8; 32]> = at_top.iter().map(|(_, a)| *a).collect();
+        let mut chosen = artifacts.iter();
+        match (chosen.next(), chosen.next()) {
+            (Some(artifact), None) => {
+                if ctx.facts.installed.get(component) != Some(artifact) {
+                    ctx.out.actions.push(Instruction::Install {
+                        component: String::from(component),
+                        artifact: *artifact,
+                    });
+                }
+            }
+            (Some(_), Some(_)) => ctx.out.conflicts.push(Conflict::new(
+                ConflictKind::DeploymentTie,
+                component,
+                Vec::new(),
+                top,
+                at_top.iter().map(|(c, _)| c.issuer),
+                at_top.iter().map(|(c, _)| c.input.digest),
+                artifacts.iter().copied(),
+            )),
+            (None, _) => {}
         }
     }
 }
 
-/// 6b. Configuration: merge fragments in scope order, honouring locks.
+/// 6b. Configuration: merge by priority, with ties and locks (see [`crate::resolve`]).
 fn plan_configs(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
-    let mut by_component: BTreeMap<&str, Vec<&Candidate<'_>>> = BTreeMap::new();
-    for w in winners
-        .iter()
-        .filter(|w| matches!(w.input.doc, Doc::Config { .. }))
-    {
-        by_component
-            .entry(w.target.component.as_str())
-            .or_default()
-            .push(w);
+    let mut by_component: BTreeMap<&str, Vec<Fragment<'_>>> = BTreeMap::new();
+    for w in winners {
+        if let Doc::Config { values, locks, .. } = &w.input.doc {
+            by_component
+                .entry(w.target.component.as_str())
+                .or_default()
+                .push(Fragment {
+                    priority: w.target.priority,
+                    issuer: w.issuer,
+                    digest: w.input.digest,
+                    values,
+                    locks,
+                    may_override_locks: w.may_override_locks,
+                });
+        }
     }
-    for (component, mut docs) in by_component {
+    for (component, fragments) in by_component {
         if ctx.withheld.contains(component) {
             continue;
         }
-        docs.sort_by_key(|d| (d.target.scope, d.issuer));
-        // The lowest-priority scope that locks a path owns the lock.
-        let mut locks = Locks::new();
-        for d in &docs {
-            if let Doc::Config { locks: paths, .. } = &d.input.doc {
-                for path in paths {
-                    locks.entry(path.clone()).or_insert(d.target.scope);
-                }
-            }
-        }
-        let mut effective = Value::Map(Vec::new());
-        for d in &docs {
-            if let Doc::Config { values, .. } = &d.input.doc {
-                Merge {
-                    component,
-                    scope: d.target.scope,
-                    locks: &locks,
-                    conflicts: &mut ctx.out.conflicts,
-                }
-                .apply(&mut effective, values);
-            }
-        }
+        let (effective, conflicts) = resolve(component, &fragments);
+        ctx.out.conflicts.extend(conflicts);
         let Ok(config) = cbor::encode(&effective) else {
             ctx.withheld.insert(String::from(component));
             continue;
