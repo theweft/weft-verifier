@@ -1,0 +1,57 @@
+[package]
+name = "weft-verifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+description = "Trusted core of weft: verifies signed documents and delegations and decides desired state, offline and deterministically."
+repository = "https://github.com/theweft/weft-verifier"
+homepage = "https://theweft.org"
+readme = "README.md"
+keywords = ["iot", "ota", "cbor", "cose", "verification"]
+categories = ["no-std", "cryptography", "embedded"]
+
+[features]
+default = []
+# ECDSA P-256 signatures (TPM 2.0 and most secure elements). Off by default to keep the TCB small.
+p256 = ["dep:p256"]
+
+# Exact versions: every dependency is part of the trusted computing base.
+# Updates are deliberate (Dependabot PR + review), never implicit.
+[dependencies]
+minicbor = { version = "=2.3.0", default-features = false, features = ["alloc"] }
+sha2 = { version = "=0.11.1", default-features = false }
+ed25519-dalek = { version = "=3.0.0", default-features = false }
+p256 = { version = "=0.14.0", default-features = false, features = ["ecdsa"], optional = true }
+
+[dev-dependencies]
+ed25519-dalek = { version = "=3.0.0", default-features = false }
+p256 = { version = "=0.14.0", default-features = false, features = ["ecdsa"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Totality: the verifier must never panic on any input.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
+unreachable = "deny"
+todo = "deny"
+unimplemented = "deny"
+# No side channels out of a pure core.
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+# Style choices.
+module_name_repetitions = "allow"
+similar_names = "allow"
+must_use_candidate = "allow"
+
+[profile.release]
+overflow-checks = true

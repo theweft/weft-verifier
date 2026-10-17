@@ -1,0 +1,7 @@
+# Pinned toolchain. Nix (flake.nix) and rustup both read this file.
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+# Bare-metal target: proves the crate builds without std (see `just nostd`).
+targets = ["thumbv7em-none-eabihf"]
