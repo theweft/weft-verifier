@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Rights carried by delegations, and the narrowing rule.
 //!
 //! The effective rights of a delegated key are the *intersection* of its issuer's rights and

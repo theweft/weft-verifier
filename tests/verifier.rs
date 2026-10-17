@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! End-to-end behaviour of `step`.
 #![allow(
     clippy::unwrap_used,

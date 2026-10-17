@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Public keys, key identifiers and signature verification.
 //!
 //! Only verification lives here. Signing happens outside the trusted core (TPM, HSM, tooling).

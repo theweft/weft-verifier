@@ -50,7 +50,7 @@ Everything runs in a pinned environment:
 ```sh
 nix develop          # or: direnv allow (uses .envrc)
 just                 # list tasks
-just ci              # everything CI runs: fmt, clippy, tests, no_std build, cargo-deny, typos, docs
+just ci              # everything CI runs: fmt, clippy, tests, no_std build, cargo-deny, REUSE, typos, docs
 ```
 
 Without Nix: install the toolchain from `rust-toolchain.toml` with rustup, plus `just`,
@@ -68,4 +68,5 @@ Dependencies are pinned exactly in `Cargo.toml` and `Cargo.lock`; every update i
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Security issues: see [SECURITY.md](SECURITY.md).
+MIT. See [LICENSE](LICENSE). The repository follows the [REUSE](https://reuse.software) specification
+(`REUSE.toml`, `LICENSES/`), and every Rust file carries an SPDX header; `just licenses` checks both. Security issues: see [SECURITY.md](SECURITY.md).

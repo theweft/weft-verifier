@@ -40,6 +40,7 @@
             pkgs.cargo-deny
             pkgs.taplo
             pkgs.typos
+            pkgs.reuse
           ];
         };
       });

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! # weft-verifier
 //!
 //! The trusted core of [weft](https://theweft.org): a pure, deterministic state-transition

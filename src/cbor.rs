@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Strict, deterministic CBOR (RFC 8949 §4.2).
 //!
 //! The verifier accepts exactly one encoding of every value. Decoding rejects anything that is

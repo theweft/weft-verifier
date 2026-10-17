@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! ECDSA P-256 (the algorithm TPMs and secure elements provide). Requires `--features p256`.
 #![cfg(feature = "p256")]
 #![allow(

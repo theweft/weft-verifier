@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Minimal `COSE_Sign1` (RFC 9052 §4.2) on top of the strict CBOR layer.
 //!
 //! Deliberately narrow: one signer, attached payload, empty external AAD, and *all* header

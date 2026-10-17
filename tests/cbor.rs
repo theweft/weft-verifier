@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! The CBOR layer accepts exactly the deterministic encoding and nothing else.
 #![allow(
     clippy::unwrap_used,

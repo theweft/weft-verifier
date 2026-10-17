@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Signed document types and their strict decoding.
 //!
 //! Every document is a CBOR map with text keys. Unknown fields, missing fields and wrong types

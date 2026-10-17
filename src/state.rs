@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Deterministic CBOR encoding of [`VerifierState`] for persistence by the shell.
 //!
 //! Stored state is read back through the same strict decoder as any other input.

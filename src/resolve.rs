@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Deterministic configuration merge: JSON Merge Patch (RFC 7396) semantics plus scope locks.
 //!
 //! Fragments are applied in a fixed order (scope priority, then issuer key id). A path locked by

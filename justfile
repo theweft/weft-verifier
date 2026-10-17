@@ -36,9 +36,15 @@ deny:
 typos:
     typos
 
+# Licence and copyright: REUSE compliance, plus an SPDX header in every Rust file.
+licenses:
+    reuse lint
+    @missing=$(git ls-files '*.rs' | while read -r f; do head -2 "$f" | grep -q 'SPDX-''License-Identifier: MIT' || echo "$f"; done); \
+    if [ -n "$missing" ]; then echo "missing SPDX header:"; echo "$missing"; exit 1; fi
+
 # API docs; broken links are errors.
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --all-features
 
 # Everything CI checks.
-ci: fmt-check clippy test nostd deny typos doc
+ci: fmt-check clippy test nostd deny licenses typos doc

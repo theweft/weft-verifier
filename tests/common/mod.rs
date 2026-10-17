@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 The weft authors
+// SPDX-License-Identifier: MIT
+
 //! Test helpers: keys, document builders and signing (signing never lives in the verifier).
 #![allow(
     clippy::unwrap_used,
