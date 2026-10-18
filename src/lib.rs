@@ -24,7 +24,8 @@
 //! assert!(decisions.actions.is_empty());
 //! assert_eq!(state, VerifierState::default());
 //! ```
-
+#![doc(html_logo_url = "https://theweft.org/brand/repos/weft-verifier.svg")]
+#![doc(html_favicon_url = "https://theweft.org/favicon.svg")]
 #![no_std]
 #![forbid(unsafe_code)]
 

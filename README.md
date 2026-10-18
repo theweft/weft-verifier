@@ -1,4 +1,4 @@
-# weft-verifier
+<h1><img src="https://theweft.org/brand/repos/weft-verifier.svg" alt="" width="44" height="44" align="absmiddle"> weft-verifier</h1>
 
 > **Status: experimental (0.0.x).** Not audited; do not rely on it for security decisions yet. APIs and formats change without notice.
 
