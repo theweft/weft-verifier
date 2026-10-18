@@ -1,13 +1,15 @@
 [package]
 name = "weft-verifier"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT"
-description = "Trusted core of weft: verifies signed documents and delegations and decides desired state, offline and deterministically."
+description = "Experimental. Trusted core of weft: verifies signed documents and delegations and decides desired state, offline and deterministically."
 repository = "https://github.com/theweft/weft-verifier"
 homepage = "https://theweft.org"
 readme = "README.md"
+# Published files only: no CI, Nix or editor configuration.
+include = ["src/**", "tests/**", "README.md", "SECURITY.md", "LICENSE", "LICENSES/**"]
 keywords = ["iot", "ota", "cbor", "cose", "verification"]
 categories = ["no-std", "cryptography", "embedded"]
 

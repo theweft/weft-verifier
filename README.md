@@ -1,5 +1,7 @@
 # weft-verifier
 
+> **Status: experimental (0.0.x).** Not audited; do not rely on it for security decisions yet. APIs and formats change without notice.
+
 The trusted core of [weft](https://theweft.org): a small, pure, deterministic state-transition
 function that verifies signed documents and delegations and decides what a device should run and
 how it should be configured.
@@ -20,7 +22,7 @@ step(state, trust anchors, device facts, raw inputs) -> (new state, decisions)
 
 In classic terms this is weft's *reference monitor* / *policy decision point*.
 
-## What it does (v0.1)
+## What it does (0.0.1)
 
 | Input | Effect |
 |---|---|
