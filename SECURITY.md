@@ -13,5 +13,3 @@ reproduces the problem. We acknowledge reports within 3 working days and coordin
 with you. Reporters are credited in the advisory unless they prefer otherwise.
 
 Only the latest release receives security fixes until a long-term support policy is published.
-
-Machine-readable contact: https://theweft.org/.well-known/security.txt
