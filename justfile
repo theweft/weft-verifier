@@ -25,8 +25,15 @@ test:
 
 # Prove the crate builds without std on a bare-metal target.
 nostd:
-    cargo build --locked --target thumbv7em-none-eabihf
-    cargo build --locked --target thumbv7em-none-eabihf --features p256
+    for t in thumbv7em-none-eabihf thumbv8m.main-none-eabihf riscv32imac-unknown-none-elf; do \
+        cargo build --locked --target $t && cargo build --locked --target $t --features p256 || exit 1; \
+    done
+
+# Builds the library for the Linux targets (no linker needed for a library).
+targets:
+    for t in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu riscv64gc-unknown-linux-gnu; do \
+        cargo build --locked --lib --target $t --all-features || exit 1; \
+    done
 
 # Licences, advisories, banned crates, allowed sources.
 deny:
@@ -47,4 +54,4 @@ doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --all-features
 
 # Everything CI checks.
-ci: fmt-check clippy test nostd deny licenses typos doc
+ci: fmt-check clippy test nostd targets deny licenses typos doc

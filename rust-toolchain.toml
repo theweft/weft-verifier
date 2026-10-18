@@ -3,5 +3,14 @@
 channel = "1.99.1"
 profile = "minimal"
 components = ["rustfmt", "clippy"]
-# Bare-metal target: proves the crate builds without std (see `just nostd`).
-targets = ["thumbv7em-none-eabihf"]
+# Supported targets (see `just targets`):
+# - Linux: x86-64, arm64, riscv64
+# - bare metal: Cortex-M4F/M7 (thumbv7em), Cortex-M33 (thumbv8m.main), RISC-V MCUs such as ESP32-C3/C6 (riscv32imac)
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "riscv64gc-unknown-linux-gnu",
+  "thumbv7em-none-eabihf",
+  "thumbv8m.main-none-eabihf",
+  "riscv32imac-unknown-none-elf",
+]
