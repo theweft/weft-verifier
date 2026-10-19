@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 The weft authors
 // SPDX-License-Identifier: MIT
+// @relation(VER-023, VER-028, scope=file)
 
 //! # weft-verifier
 //!

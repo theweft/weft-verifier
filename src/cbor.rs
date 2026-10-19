@@ -85,6 +85,8 @@ pub enum CborError {
 /// # Errors
 ///
 /// Returns a [`CborError`] for any input outside the accepted subset.
+///
+/// @relation(VER-001, scope=function)
 pub fn decode(bytes: &[u8], limits: &Limits) -> Result<Value, CborError> {
     if bytes.len() > limits.max_len {
         return Err(CborError::TooLong);
@@ -101,6 +103,7 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<Value, CborError> {
     Ok(value)
 }
 
+/// @relation(VER-001, VER-002, scope=function)
 fn decode_value(
     d: &mut Decoder<'_>,
     limits: &Limits,
@@ -167,6 +170,8 @@ fn decode_value(
 }
 
 /// Validates a container length before allocating for it.
+///
+/// @relation(VER-002, scope=function)
 fn definite_len(d: &Decoder<'_>, len: Option<u64>, limits: &Limits) -> Result<usize, CborError> {
     let len = len.ok_or(CborError::Unsupported)?; // indefinite length
     let len = usize::try_from(len).map_err(|_| CborError::TooManyItems)?;
@@ -184,6 +189,8 @@ fn definite_len(d: &Decoder<'_>, len: Option<u64>, limits: &Limits) -> Result<us
 ///
 /// Returns [`CborError::InvalidKey`] for non-`Int`/`Text` map keys and
 /// [`CborError::KeyOrder`] for duplicate keys.
+///
+/// @relation(VER-003, scope=function)
 pub fn encode(value: &Value) -> Result<Vec<u8>, CborError> {
     let mut encoder = Encoder::new(Vec::new());
     encode_into(&mut encoder, value)?;

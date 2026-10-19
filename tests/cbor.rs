@@ -15,6 +15,7 @@ fn dec(bytes: &[u8]) -> Result<Value, CborError> {
     decode(bytes, &Limits::DEFAULT)
 }
 
+/// @relation(VER-003, scope=function)
 #[test]
 fn round_trip() {
     let v = Value::map([
@@ -26,6 +27,7 @@ fn round_trip() {
     assert_eq!(dec(&bytes).unwrap(), v);
 }
 
+/// @relation(VER-003, scope=function)
 #[test]
 fn encoder_sorts_keys_length_first() {
     // "b" (shorter) sorts before "aa"; integer keys sort before text keys.
@@ -41,12 +43,14 @@ fn encoder_sorts_keys_length_first() {
     );
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_non_shortest_integer() {
     assert_eq!(dec(&[0x01]).unwrap(), Value::Int(1));
     assert_eq!(dec(&[0x18, 0x01]), Err(CborError::NotCanonical));
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_unsorted_and_duplicate_keys() {
     // {"b": 1, "a": 2}
@@ -61,6 +65,7 @@ fn rejects_unsorted_and_duplicate_keys() {
     );
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_indefinite_lengths_floats_tags_and_undefined() {
     assert_eq!(dec(&[0x9f, 0x01, 0xff]), Err(CborError::Unsupported)); // [_ 1]
@@ -69,6 +74,7 @@ fn rejects_indefinite_lengths_floats_tags_and_undefined() {
     assert_eq!(dec(&[0xf7]), Err(CborError::Unsupported)); // undefined
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_integers_outside_i64() {
     // 2^64 - 1
@@ -78,6 +84,7 @@ fn rejects_integers_outside_i64() {
     );
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_trailing_bytes_and_truncation() {
     assert_eq!(dec(&[0x01, 0x02]), Err(CborError::TrailingBytes));
@@ -85,6 +92,7 @@ fn rejects_trailing_bytes_and_truncation() {
     assert_eq!(dec(&[0x62, b'a']), Err(CborError::Malformed));
 }
 
+/// @relation(VER-002, scope=function)
 #[test]
 fn rejects_lying_lengths_before_allocating() {
     // Array header claiming 2^32 elements in a 5-byte input.
@@ -94,6 +102,7 @@ fn rejects_lying_lengths_before_allocating() {
     );
 }
 
+/// @relation(VER-002, scope=function)
 #[test]
 fn enforces_depth_and_size_limits() {
     let mut deep = vec![0x81; 20];
@@ -109,6 +118,7 @@ fn enforces_depth_and_size_limits() {
     );
 }
 
+/// @relation(VER-001, scope=function)
 #[test]
 fn rejects_invalid_utf8_and_non_scalar_keys() {
     assert_eq!(dec(&[0x61, 0xff]), Err(CborError::Malformed));

@@ -57,6 +57,8 @@ pub struct PublicKey {
 
 impl PublicKey {
     /// Computes this key's [`KeyId`].
+    ///
+    /// @relation(VER-007, scope=function)
     pub fn key_id(&self) -> KeyId {
         let mut hasher = Sha256::new();
         hasher.update(b"weft-key-id-v1");
@@ -71,6 +73,8 @@ impl PublicKey {
     }
 
     /// Verifies `signature` over `message`. Returns `false` for any malformed key or signature.
+    ///
+    /// @relation(VER-006, scope=function)
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
         match self.alg {
             Algorithm::Ed25519 => verify_ed25519(&self.bytes, message, signature),
@@ -80,6 +84,7 @@ impl PublicKey {
     }
 }
 
+/// @relation(VER-006, scope=function)
 fn verify_ed25519(key: &[u8], message: &[u8], signature: &[u8]) -> bool {
     let Ok(key) = <&[u8; 32]>::try_from(key) else {
         return false;

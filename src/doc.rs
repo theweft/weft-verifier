@@ -116,6 +116,8 @@ pub enum DocError {
 /// # Errors
 ///
 /// Returns [`DocError`] for anything that is not exactly a valid document.
+///
+/// @relation(VER-005, scope=function)
 pub fn parse(value: &Value) -> Result<Doc, DocError> {
     let mut obj = Obj::new(value)?;
     if obj.req("v")?.as_int() != Some(FORMAT_VERSION) {
@@ -344,6 +346,7 @@ impl<'a> Obj<'a> {
         self.opt(key).ok_or(DocError::Missing)
     }
 
+    /// @relation(VER-005, scope=function)
     fn finish(self) -> Result<(), DocError> {
         if self.used.iter().all(|u| *u) {
             Ok(())

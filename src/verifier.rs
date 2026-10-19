@@ -266,6 +266,8 @@ pub fn step(
 }
 
 /// 1. Parse, deduplicate and order all inputs by digest (order independence).
+///
+/// @relation(VER-022, scope=function)
 fn parse_inputs(
     ctx: &mut Ctx<'_>,
     inputs: &[&[u8]],
@@ -289,6 +291,8 @@ fn parse_inputs(
 }
 
 /// 2. Revocations by trust anchors. Monotonic: the revoked set only grows.
+///
+/// @relation(VER-012, scope=function)
 fn apply_revocations(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) {
     for input in parsed {
         let Doc::Revocation { header, key_id } = &input.doc else {
@@ -306,6 +310,8 @@ fn apply_revocations(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]
 }
 
 /// 3. Delegation graph: effective rights per key, intersected along every chain.
+///
+/// @relation(VER-008, VER-009, VER-027, scope=function)
 fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) -> Keys {
     let mut keys = Keys::new();
     for anchor in roots {
@@ -394,6 +400,8 @@ fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) 
 }
 
 /// 4. Config fragments and deployments: check signer, signature, rights and targeting.
+///
+/// @relation(VER-010, VER-025, scope=function)
 fn authorize_documents<'a>(
     ctx: &mut Ctx<'_>,
     keys: &Keys,
@@ -469,6 +477,8 @@ fn authorize_documents<'a>(
 }
 
 /// 5. Per slot: newest version wins; enforce anti-rollback and detect equivocation.
+///
+/// @relation(VER-018, VER-019, VER-020, scope=function)
 fn select_winners<'a>(
     ctx: &mut Ctx<'_>,
     slots: BTreeMap<Slot, Vec<Candidate<'a>>>,
@@ -528,6 +538,8 @@ fn select_winners<'a>(
 
 /// 6a. Deployments: the highest priority wins. Different artifacts from different issuers at
 /// that priority are a conflict: nothing is installed and the current version keeps running.
+///
+/// @relation(VER-013, VER-016, VER-026, scope=function)
 fn plan_deployments(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
     let mut by_component: BTreeMap<&str, Vec<(&Candidate<'_>, [u8; 32])>> = BTreeMap::new();
     for w in winners {
@@ -575,6 +587,8 @@ fn plan_deployments(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
 }
 
 /// 6b. Configuration: merge by priority, with ties and locks (see [`crate::resolve`]).
+///
+/// @relation(VER-026, scope=function)
 fn plan_configs(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
     let mut by_component: BTreeMap<&str, Vec<Fragment<'_>>> = BTreeMap::new();
     for w in winners {
@@ -614,6 +628,8 @@ fn plan_configs(ctx: &mut Ctx<'_>, winners: &[Candidate<'_>]) {
 }
 
 /// Canonical ordering of all outputs.
+///
+/// @relation(VER-021, VER-022, scope=function)
 fn finish(ctx: Ctx<'_>) -> (VerifierState, Decisions) {
     let Ctx {
         mut next,
@@ -636,6 +652,7 @@ fn finish(ctx: Ctx<'_>) -> (VerifierState, Decisions) {
     (next, out)
 }
 
+/// @relation(VER-007, scope=function)
 fn kid_of(sign1: &Sign1) -> Option<KeyId> {
     <KeyId>::try_from(sign1.kid.as_slice()).ok()
 }
@@ -652,6 +669,8 @@ fn signed_by(input: &Input, key: &PublicKey) -> bool {
 }
 
 /// Classifies why an input's signer cannot act here, if it cannot.
+///
+/// @relation(VER-011, VER-012, scope=function)
 fn signer_problem(
     input: &Input,
     keys: &BTreeMap<KeyId, (PublicKey, Vec<Rights>)>,

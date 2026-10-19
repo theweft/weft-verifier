@@ -39,7 +39,7 @@ pub fn prio(name: &str) -> i64 {
 pub const NOW: u64 = 1_800_000_000;
 
 pub struct Key {
-    sk: SigningKey,
+    pub sk: SigningKey,
     pub pk: PublicKey,
 }
 

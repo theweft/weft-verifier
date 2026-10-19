@@ -53,6 +53,8 @@ impl Sign1 {
     /// # Errors
     ///
     /// Returns [`CoseError`] for malformed input or unsupported features.
+    ///
+    /// @relation(VER-004, scope=function)
     pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Sign1, CoseError> {
         let body = match bytes.split_first() {
             Some((&TAG_SIGN1, rest)) => rest,

@@ -75,6 +75,7 @@ pub struct Conflict {
 }
 
 impl Conflict {
+    /// @relation(VER-017, scope=function)
     pub(crate) fn new(
         kind: ConflictKind,
         component: &str,
@@ -164,6 +165,8 @@ struct LockOwner {
 }
 
 /// Merges all fragments of one component. Returns the effective configuration and conflicts.
+///
+/// @relation(VER-013, scope=function)
 pub(crate) fn resolve(component: &str, fragments: &[Fragment<'_>]) -> (Value, Vec<Conflict>) {
     let locks = lock_owners(fragments);
     let mut by_priority: BTreeMap<Priority, Vec<&Fragment<'_>>> = BTreeMap::new();
@@ -194,6 +197,8 @@ pub(crate) fn resolve(component: &str, fragments: &[Fragment<'_>]) -> (Value, Ve
 }
 
 /// Lock owners: for each locked path, the issuers of the lowest-priority fragments locking it.
+///
+/// @relation(VER-015, scope=function)
 fn lock_owners(fragments: &[Fragment<'_>]) -> BTreeMap<Vec<String>, LockOwner> {
     let mut lowest: BTreeMap<&Vec<String>, Priority> = BTreeMap::new();
     for f in fragments {
@@ -259,6 +264,8 @@ fn flatten<'a>(
 
 /// Finds incompatible changes between different issuers at one priority. `changes` is sorted by
 /// path, so all descendants of a path directly follow it.
+///
+/// @relation(VER-014, scope=function)
 fn find_ties(
     component: &str,
     priority: Priority,
@@ -390,6 +397,8 @@ fn apply(
 }
 
 /// The lock (if any) that forbids this change for its issuer.
+///
+/// @relation(VER-015, scope=function)
 fn blocking_lock<'l>(
     change: &Change<'_>,
     locks: &'l BTreeMap<Vec<String>, LockOwner>,

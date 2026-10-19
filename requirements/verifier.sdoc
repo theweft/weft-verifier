@@ -1,0 +1,490 @@
+[DOCUMENT]
+TITLE: weft-verifier requirements
+VERSION: 0.1 (draft)
+OPTIONS:
+  MARKUP: Text
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: SECTION
+  PROPERTIES:
+    IS_COMPOSITE: True
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+- TAG: TEXT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+- TAG: REQUIREMENT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATUS
+    TYPE: SingleChoice(Draft, Active, Deleted)
+    REQUIRED: True
+  - TITLE: VERIFICATION
+    TYPE: SingleChoice(Test, Analysis, Inspection, Demonstration)
+    REQUIRED: True
+  - TITLE: TITLE
+    TYPE: String
+    REQUIRED: True
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: True
+  - TITLE: RATIONALE
+    TYPE: String
+    REQUIRED: False
+  - TITLE: DERIVED_FROM
+    HUMAN_TITLE: Derived from (design principles, docs/04)
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STANDARDS
+    HUMAN_TITLE: Standards (draft mapping)
+    TYPE: String
+    REQUIRED: False
+  - TITLE: FACTS
+    HUMAN_TITLE: Facts (facts.toml in the design repository)
+    TYPE: String
+    REQUIRED: False
+  RELATIONS:
+  - TYPE: Parent
+  - TYPE: File
+
+[TEXT]
+STATEMENT: >>>
+Component requirements of weft-verifier. Each requirement is traced to the code that implements it and to the tests that verify it by @relation markers in src/ and tests/. The gate in tests/requirements.rs fails when an Active requirement verified by Test has no implementation or no test reference, or when a marker names an unknown requirement.
+
+STANDARDS is a draft mapping to IEC 62443-4-2 component requirements (CR) and CRA Annex I; it has not been reviewed by an assessor. DERIVED_FROM refers to principles D1-D9 of the design repository. FACTS refers to entries of facts.toml in the design repository.
+<<<
+
+[[SECTION]]
+TITLE: Input handling
+
+[REQUIREMENT]
+UID: VER-001
+STATUS: Active
+VERIFICATION: Test
+TITLE: Canonical input only
+STATEMENT: >>>
+The verifier shall reject every input that is not deterministic CBOR (RFC 8949 §4.2): non-shortest integers, unsorted or duplicate map keys, indefinite lengths, floats, tags, undefined, integers outside i64, invalid UTF-8, non-text keys, trailing bytes and truncated input.
+<<<
+RATIONALE: >>>
+One encoding per value makes signatures and digests unambiguous and removes parser differentials.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 3.5; CRA Annex I Part I 2(f), 2(j)
+
+[REQUIREMENT]
+UID: VER-002
+STATUS: Active
+VERIFICATION: Test
+TITLE: Bounded decoding
+STATEMENT: >>>
+The verifier shall enforce limits on input size, nesting depth and item count, and shall check declared lengths against the remaining input before allocating.
+<<<
+RATIONALE: >>>
+Hostile inputs must not exhaust memory or stack on small devices.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 7.1, CR 7.2; CRA Annex I Part I 2(h)
+FACTS: verifier.cbor.max_len, verifier.cbor.max_depth, verifier.cbor.max_items
+
+[REQUIREMENT]
+UID: VER-003
+STATUS: Active
+VERIFICATION: Test
+TITLE: Canonical encoding
+STATEMENT: >>>
+The encoder shall produce deterministic CBOR (map keys sorted by their encoding) that the decoder accepts, so that decode(encode(v)) = v.
+<<<
+RATIONALE: >>>
+Tools that sign documents and devices that verify them must agree byte for byte.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 3.4
+
+[REQUIREMENT]
+UID: VER-004
+STATUS: Active
+VERIFICATION: Test
+TITLE: Strict COSE_Sign1 structure
+STATEMENT: >>>
+The verifier shall accept only COSE_Sign1 messages whose unprotected header is empty and whose protected header contains exactly the algorithm and the key id.
+<<<
+RATIONALE: >>>
+Unprotected or extra header fields could change meaning without being signed.
+<<<
+DERIVED_FROM: D6, D9
+STANDARDS: IEC 62443-4-2 CR 3.4, CR 3.5; CRA Annex I Part I 2(f)
+
+[REQUIREMENT]
+UID: VER-005
+STATUS: Active
+VERIFICATION: Test
+TITLE: Strict document schema
+STATEMENT: >>>
+The verifier shall reject documents with unknown fields, missing required fields or wrongly typed values.
+<<<
+RATIONALE: >>>
+Fields a device ignores but an authoring tool shows are a classic source of confusion attacks.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 3.5; CRA Annex I Part I 2(j)
+FACTS: verifier.format_version
+
+[[/SECTION]]
+
+[[SECTION]]
+TITLE: Trust and authorization
+
+[REQUIREMENT]
+UID: VER-006
+STATUS: Active
+VERIFICATION: Test
+TITLE: Signature verification
+STATEMENT: >>>
+The verifier shall accept a document only if its signature verifies with the selected key under the declared algorithm, using strict verification rules (no malleable Ed25519 signatures), and only for supported algorithms.
+<<<
+RATIONALE: >>>
+Integrity of every document rests on this check.
+<<<
+DERIVED_FROM: D3, D6
+STANDARDS: IEC 62443-4-2 CR 1.9, CR 3.4; CRA Annex I Part I 2(f)
+FACTS: verifier.alg.ed25519, verifier.alg.es256
+
+[REQUIREMENT]
+UID: VER-007
+STATUS: Active
+VERIFICATION: Test
+TITLE: Key identity is computed
+STATEMENT: >>>
+Key ids shall be computed from the public key. A key id in a document only selects a key; it never grants that key's authority to a different signer.
+<<<
+RATIONALE: >>>
+A document must not be able to claim another key's identity.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 1.9
+FACTS: verifier.key_id_len, verifier.key_id_domain
+
+[REQUIREMENT]
+UID: VER-008
+STATUS: Active
+VERIFICATION: Test
+TITLE: Trust anchors are the only source of authority
+STATEMENT: >>>
+All authority shall derive from the configured trust anchors. Without trust anchors no document shall have any effect.
+<<<
+RATIONALE: >>>
+Deny by default; no implicit trust in servers or paths.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 1.9, CR 2.1; CRA Annex I Part I 2(d)
+
+[REQUIREMENT]
+UID: VER-009
+STATUS: Active
+VERIFICATION: Test
+TITLE: Delegation narrows rights
+STATEMENT: >>>
+The effective rights of a delegated key shall be the intersection of its issuer's rights and the rights the delegation declares, and a delegation shall only be effective if its issuer holds the delegate right.
+<<<
+RATIONALE: >>>
+Narrowing by construction: no delegation can grant more than its issuer has.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 2.1; CRA Annex I Part I 2(d)
+
+[REQUIREMENT]
+UID: VER-010
+STATUS: Active
+VERIFICATION: Test
+TITLE: Validity windows
+STATEMENT: >>>
+Rights shall only be used within their validity window, evaluated against the trusted time floor; documents signed outside it shall be rejected as expired.
+<<<
+RATIONALE: >>>
+Limits the damage of leaked or forgotten keys without needing online checks.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 1.9
+
+[REQUIREMENT]
+UID: VER-011
+STATUS: Active
+VERIFICATION: Test
+TITLE: Tenant isolation
+STATEMENT: >>>
+Documents for another tenant, and keys rooted in another tenant's anchors, shall have no effect.
+<<<
+RATIONALE: >>>
+One device may only obey its own tenant.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 2.1; CRA Annex I Part I 2(d)
+
+[REQUIREMENT]
+UID: VER-012
+STATUS: Active
+VERIFICATION: Test
+TITLE: Revocation
+STATEMENT: >>>
+Only trust anchors shall revoke keys. A revoked key shall be rejected permanently, including in delegation chains.
+<<<
+RATIONALE: >>>
+Revocation is monotonic and coordination-free (CALM).
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 1.9; CRA Annex I Part I 2(d)
+
+[REQUIREMENT]
+UID: VER-027
+STATUS: Draft
+VERIFICATION: Test
+TITLE: Bounded delegation graph
+STATEMENT: >>>
+Delegation chains longer than the maximum depth, and keys with more rights sets than the maximum, shall have no effect.
+<<<
+RATIONALE: >>>
+Bounds work per step on small devices. Implemented; dedicated test still missing.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 7.2
+FACTS: verifier.max_chain_depth, verifier.max_rights_per_key
+
+[[/SECTION]]
+
+[[SECTION]]
+TITLE: Precedence and conflicts
+
+[REQUIREMENT]
+UID: VER-013
+STATUS: Active
+VERIFICATION: Test
+TITLE: Numeric precedence
+STATEMENT: >>>
+Among authorized documents for the same component, a higher priority shall win; for configuration, values merge per field (JSON Merge Patch) with higher priorities overriding lower ones.
+<<<
+RATIONALE: >>>
+Precedence is a plain number; names belong to the tenant's scope profile.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 2.1
+FACTS: priority.default.fleet, priority.default.group, priority.default.site, priority.default.device, priority.default.local
+
+[REQUIREMENT]
+UID: VER-014
+STATUS: Active
+VERIFICATION: Test
+TITLE: Ties apply neither change
+STATEMENT: >>>
+When different issuers change the same configuration path, or a path and its subtree, at the same priority with different values, neither change shall apply and a conflict shall be reported.
+<<<
+RATIONALE: >>>
+No hidden tie-breaking: an arbitrary winner would be silent data loss.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 3.6
+
+[REQUIREMENT]
+UID: VER-015
+STATUS: Active
+VERIFICATION: Test
+TITLE: Locks
+STATEMENT: >>>
+A locked field shall only be changed by its lock owners or by keys holding the locks.override right; other changes shall not apply and shall be reported as conflicts.
+<<<
+RATIONALE: >>>
+Lets lower levels protect critical values (e.g. grid codes, safety limits).
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 2.1
+
+[REQUIREMENT]
+UID: VER-016
+STATUS: Active
+VERIFICATION: Test
+TITLE: Deployment ties install nothing
+STATEMENT: >>>
+When different issuers deploy different artifacts for the same component at the same highest priority, nothing shall be installed for it and a conflict shall be reported; the same artifact is not a conflict.
+<<<
+RATIONALE: >>>
+Fail safe: keep what runs instead of guessing.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 3.6
+
+[REQUIREMENT]
+UID: VER-017
+STATUS: Active
+VERIFICATION: Test
+TITLE: Reported, stable conflicts
+STATEMENT: >>>
+Every conflict shall be reported with an id that depends only on its kind, component, path and documents, so that the same conflict has the same id on every device.
+<<<
+RATIONALE: >>>
+Conflicts are never silent and can be aggregated fleet-wide.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 2.8; CRA Annex I Part I 2(l)
+
+[[/SECTION]]
+
+[[SECTION]]
+TITLE: Freshness and safety
+
+[REQUIREMENT]
+UID: VER-018
+STATUS: Active
+VERIFICATION: Test
+TITLE: Rollback protection
+STATEMENT: >>>
+For each slot the verifier shall reject documents with a lower version than the accepted one, and the newest version shall win.
+<<<
+RATIONALE: >>>
+Stops replay of old, possibly vulnerable, configurations and software.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 3.4; CRA Annex I Part I 2(c), 2(f)
+
+[REQUIREMENT]
+UID: VER-019
+STATUS: Active
+VERIFICATION: Test
+TITLE: Equivocation detection
+STATEMENT: >>>
+Two different documents with the same version for the same slot shall be rejected and reported as equivocation.
+<<<
+RATIONALE: >>>
+A signer showing different devices different content is detectable.
+<<<
+DERIVED_FROM: D3
+STANDARDS: IEC 62443-4-2 CR 3.4
+
+[REQUIREMENT]
+UID: VER-020
+STATUS: Active
+VERIFICATION: Test
+TITLE: Withhold when incomplete
+STATEMENT: >>>
+If an accepted document for a component is missing from the input, the verifier shall withhold that component instead of acting on partial state.
+<<<
+RATIONALE: >>>
+Fail safe on missing information.
+<<<
+DERIVED_FROM: D3, D9
+STANDARDS: IEC 62443-4-2 CR 3.6
+
+[REQUIREMENT]
+UID: VER-021
+STATUS: Active
+VERIFICATION: Test
+TITLE: Forward-only time floor
+STATEMENT: >>>
+The trusted time floor shall only move forward, to the highest issued_at of accepted signed documents.
+<<<
+RATIONALE: >>>
+Devices without a reliable clock still gain a lower bound on time.
+<<<
+DERIVED_FROM: D2
+STANDARDS: IEC 62443-4-2 CR 2.11
+
+[[/SECTION]]
+
+[[SECTION]]
+TITLE: Robustness and state
+
+[REQUIREMENT]
+UID: VER-022
+STATUS: Active
+VERIFICATION: Test
+TITLE: Deterministic result
+STATEMENT: >>>
+The result of a step shall not depend on the order of the inputs.
+<<<
+RATIONALE: >>>
+Devices receiving the same documents over different paths must decide the same.
+<<<
+DERIVED_FROM: D3, D4
+STANDARDS: IEC 62443-4-2 CR 3.6
+
+[REQUIREMENT]
+UID: VER-023
+STATUS: Active
+VERIFICATION: Test
+TITLE: Totality
+STATEMENT: >>>
+The verifier shall never panic, whatever its input; every failure is a typed rejection.
+<<<
+RATIONALE: >>>
+A crash is a denial of service and hides the reason.
+<<<
+DERIVED_FROM: D9
+STANDARDS: IEC 62443-4-2 CR 3.7; CRA Annex I Part I 2(h)
+
+[REQUIREMENT]
+UID: VER-024
+STATUS: Active
+VERIFICATION: Test
+TITLE: Persistable state
+STATEMENT: >>>
+The verifier state (marks, time floor, revocations) shall round-trip through its CBOR encoding without loss.
+<<<
+RATIONALE: >>>
+Anti-rollback depends on state surviving restarts and power loss.
+<<<
+DERIVED_FROM: D2, D3
+STANDARDS: IEC 62443-4-2 CR 3.4
+
+[REQUIREMENT]
+UID: VER-025
+STATUS: Active
+VERIFICATION: Test
+TITLE: Only addressed documents
+STATEMENT: >>>
+Documents whose selector does not match the device's labels shall be ignored, not rejected.
+<<<
+RATIONALE: >>>
+Group documents travel everywhere; non-matching ones are normal traffic.
+<<<
+DERIVED_FROM: D4
+STANDARDS: IEC 62443-4-2 CR 2.1
+
+[REQUIREMENT]
+UID: VER-026
+STATUS: Active
+VERIFICATION: Test
+TITLE: Idempotence
+STATEMENT: >>>
+The verifier shall not instruct an action whose result is already in place (configuration already applied, artifact already installed).
+<<<
+RATIONALE: >>>
+Repeated steps must be cheap and side-effect free.
+<<<
+DERIVED_FROM: D2
+
+[REQUIREMENT]
+UID: VER-028
+STATUS: Active
+VERIFICATION: Inspection
+TITLE: Minimal, pure core
+STATEMENT: >>>
+The verifier shall be no_std, contain no unsafe code and perform no I/O (no network, files, clock, randomness or global state).
+<<<
+RATIONALE: >>>
+Small trusted code is easier to review and certify. Verified by #![forbid(unsafe_code)], #![no_std] and the bare-metal builds in CI (just nostd).
+<<<
+DERIVED_FROM: D8, D9
+STANDARDS: CRA Annex I Part I 2(j), 2(k)
+
+[[/SECTION]]

@@ -44,6 +44,8 @@ impl VerifierState {
     /// # Errors
     ///
     /// Only fails if encoding fails, which cannot happen for well-typed state.
+    ///
+    /// @relation(VER-024, scope=function)
     pub fn to_cbor(&self) -> Result<Vec<u8>, CborError> {
         let marks = self
             .marks
@@ -83,6 +85,8 @@ impl VerifierState {
     /// # Errors
     ///
     /// Returns [`StateError`] for anything that is not exactly a valid state document.
+    ///
+    /// @relation(VER-024, scope=function)
     pub fn from_cbor(bytes: &[u8]) -> Result<VerifierState, StateError> {
         let value = cbor::decode(bytes, &STATE_LIMITS)?;
         let Value::Map(entries) = &value else {

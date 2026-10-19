@@ -105,6 +105,8 @@ impl Rights {
     }
 
     /// The intersection of two sets of rights, or `None` if nothing remains.
+    ///
+    /// @relation(VER-009, scope=function)
     pub fn intersect(&self, other: &Rights) -> Option<Rights> {
         if self.tenant != other.tenant {
             return None;
@@ -174,6 +176,8 @@ impl Rights {
     }
 
     /// Whether `now` lies in the validity window.
+    ///
+    /// @relation(VER-010, scope=function)
     pub fn is_valid_at(&self, now: u64) -> bool {
         self.not_before <= now && now <= self.not_after
     }

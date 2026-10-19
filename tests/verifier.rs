@@ -64,6 +64,7 @@ fn frag<'a>(scope: &'a str, component: &'a str, version: i64, values: Value) -> 
     }
 }
 
+/// @relation(VER-008, scope=function)
 #[test]
 fn root_signed_config_is_applied() {
     let root = key(1);
@@ -92,6 +93,7 @@ fn root_signed_config_is_applied() {
     assert_eq!(state.time_floor, NOW);
 }
 
+/// @relation(VER-008, scope=function)
 #[test]
 fn nothing_happens_without_trust_anchors() {
     let root = key(1);
@@ -101,6 +103,7 @@ fn nothing_happens_without_trust_anchors() {
     assert_eq!(reason_of(&d, &doc), Some(Reason::UnknownSigner));
 }
 
+/// @relation(VER-026, scope=function)
 #[test]
 fn already_applied_config_produces_no_action() {
     let root = key(1);
@@ -123,6 +126,7 @@ fn already_applied_config_produces_no_action() {
     assert!(second.actions.is_empty());
 }
 
+/// @relation(VER-009, scope=function)
 #[test]
 fn delegation_narrows_rights() {
     let root = key(1);
@@ -195,6 +199,7 @@ fn delegation_narrows_rights() {
     );
 }
 
+/// @relation(VER-009, scope=function)
 #[test]
 fn redelegation_cannot_widen_rights() {
     let root = key(1);
@@ -224,6 +229,7 @@ fn redelegation_cannot_widen_rights() {
     assert!(d.accepted.contains(&digest(&app)));
 }
 
+/// @relation(VER-009, scope=function)
 #[test]
 fn delegation_without_delegate_right_grants_nothing() {
     let root = key(1);
@@ -251,6 +257,7 @@ fn delegation_without_delegate_right_grants_nothing() {
     assert_eq!(reason_of(&d, &doc), Some(Reason::UnknownSigner));
 }
 
+/// @relation(VER-010, scope=function)
 #[test]
 fn expired_delegation_is_reported_as_expired() {
     let root = key(1);
@@ -276,6 +283,7 @@ fn expired_delegation_is_reported_as_expired() {
     assert!(d.actions.is_empty());
 }
 
+/// @relation(VER-015, VER-017, scope=function)
 #[test]
 fn locks_block_other_issuers_and_report_conflicts() {
     let root = key(1);
@@ -330,6 +338,7 @@ fn locks_block_other_issuers_and_report_conflicts() {
     assert_eq!(c.documents, sorted(&[digest(&site), digest(&fleet)]));
 }
 
+/// @relation(VER-015, scope=function)
 #[test]
 fn lock_owner_and_lock_override_right_may_change_locked_fields() {
     let root = key(1);
@@ -396,6 +405,7 @@ fn lock_owner_and_lock_override_right_may_change_locked_fields() {
     assert!(d.conflicts.is_empty());
 }
 
+/// @relation(VER-014, scope=function)
 #[test]
 fn equal_priority_tie_applies_neither_change() {
     let root = key(1);
@@ -483,6 +493,7 @@ fn equal_priority_tie_applies_neither_change() {
     assert_eq!(c.values.len(), 2);
 }
 
+/// @relation(VER-014, scope=function)
 #[test]
 fn structural_tie_between_value_and_subtree() {
     let root = key(1);
@@ -521,6 +532,7 @@ fn structural_tie_between_value_and_subtree() {
     assert_eq!(d.conflicts[0].path, vec!["alarm".to_string()]);
 }
 
+/// @relation(VER-013, scope=function)
 #[test]
 fn tenant_profile_decides_cross_cutting_precedence() {
     // The tenant's profile puts "model" at 25 (between group and site): site overrides model.
@@ -552,6 +564,7 @@ fn tenant_profile_decides_cross_cutting_precedence() {
     );
 }
 
+/// @relation(VER-016, scope=function)
 #[test]
 fn deployment_tie_installs_nothing_and_same_artifact_is_fine() {
     let root = key(1);
@@ -596,6 +609,7 @@ fn deployment_tie_installs_nothing_and_same_artifact_is_fine() {
     assert!(d.conflicts.is_empty());
 }
 
+/// @relation(VER-017, scope=function)
 #[test]
 fn conflict_ids_are_stable_across_devices() {
     let root = key(1);
@@ -629,6 +643,7 @@ fn conflict_ids_are_stable_across_devices() {
     assert_eq!(d1.conflicts[0].id, d2.conflicts[0].id);
 }
 
+/// @relation(VER-013, scope=function)
 #[test]
 fn merge_patch_null_deletes_and_higher_scope_wins() {
     let root = key(1);
@@ -662,6 +677,7 @@ fn merge_patch_null_deletes_and_higher_scope_wins() {
     );
 }
 
+/// @relation(VER-018, scope=function)
 #[test]
 fn rollback_is_rejected_and_newest_version_wins() {
     let root = key(1);
@@ -696,6 +712,7 @@ fn rollback_is_rejected_and_newest_version_wins() {
     assert!(d.accepted.contains(&digest(&v2)));
 }
 
+/// @relation(VER-020, scope=function)
 #[test]
 fn missing_accepted_document_withholds_component() {
     let root = key(1);
@@ -714,6 +731,7 @@ fn missing_accepted_document_withholds_component() {
     assert!(d.actions.is_empty());
 }
 
+/// @relation(VER-019, scope=function)
 #[test]
 fn equivocation_is_rejected() {
     let root = key(1);
@@ -739,6 +757,7 @@ fn equivocation_is_rejected() {
     assert_eq!(d.conflicts[0].documents, sorted(&[digest(&a), digest(&b)]));
 }
 
+/// @relation(VER-013, VER-026, scope=function)
 #[test]
 fn deployment_highest_scope_wins_and_installed_is_skipped() {
     let root = key(1);
@@ -768,6 +787,7 @@ fn deployment_highest_scope_wins_and_installed_is_skipped() {
     assert!(d.actions.is_empty());
 }
 
+/// @relation(VER-025, scope=function)
 #[test]
 fn documents_for_other_devices_are_ignored() {
     let root = key(1);
@@ -788,6 +808,7 @@ fn documents_for_other_devices_are_ignored() {
     assert!(d.actions.is_empty());
 }
 
+/// @relation(VER-012, scope=function)
 #[test]
 fn revocation_removes_a_key_permanently() {
     let root = key(1);
@@ -808,6 +829,7 @@ fn revocation_removes_a_key_permanently() {
     assert_eq!(reason_of(&d, &doc), Some(Reason::Revoked));
 }
 
+/// @relation(VER-012, scope=function)
 #[test]
 fn only_anchors_can_revoke() {
     let root = key(1);
@@ -825,6 +847,7 @@ fn only_anchors_can_revoke() {
     assert!(state.revoked.is_empty());
 }
 
+/// @relation(VER-006, VER-011, scope=function)
 #[test]
 fn tampered_signature_and_wrong_tenant_are_rejected() {
     let root = key(1);
@@ -851,6 +874,7 @@ fn tampered_signature_and_wrong_tenant_are_rejected() {
     assert!(d.actions.is_empty());
 }
 
+/// @relation(VER-011, scope=function)
 #[test]
 fn anchors_of_other_tenants_have_no_power() {
     let root = key(1);
@@ -869,6 +893,7 @@ fn anchors_of_other_tenants_have_no_power() {
     assert_eq!(TENANT, "acme");
 }
 
+/// @relation(VER-021, scope=function)
 #[test]
 fn signed_documents_advance_the_time_floor() {
     let root = key(1);
@@ -890,6 +915,7 @@ fn signed_documents_advance_the_time_floor() {
     assert_eq!(state.time_floor, NOW + 100);
 }
 
+/// @relation(VER-022, scope=function)
 #[test]
 fn result_is_independent_of_input_order() {
     let root = key(1);
@@ -956,6 +982,7 @@ fn permute(items: &mut Vec<usize>, k: usize, f: &mut dyn FnMut(&[usize])) {
     }
 }
 
+/// @relation(VER-024, scope=function)
 #[test]
 fn state_round_trips_through_cbor() {
     let root = key(1);
@@ -975,6 +1002,7 @@ fn state_round_trips_through_cbor() {
     assert!(VerifierState::from_cbor(&bytes[1..]).is_err());
 }
 
+/// @relation(VER-023, scope=function)
 #[test]
 fn arbitrary_bytes_never_panic() {
     let root = key(1);

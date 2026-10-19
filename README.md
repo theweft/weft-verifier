@@ -46,6 +46,21 @@ missing (fail safe).
   hybrid signatures are planned.
 - Key ids are computed from the key (SHA-256, 16 bytes), never taken from documents.
 
+## Requirements and traceability
+
+Requirements live in [requirements/verifier.sdoc](requirements/verifier.sdoc) (StrictDoc format), each with a status, a verification method, the design principles it derives from, and a draft mapping to IEC 62443-4-2 and CRA Annex I.
+
+Code and tests point back with a doc comment on the function:
+
+```rust
+/// @relation(VER-014, scope=function)
+#[test]
+fn equal_priority_tie_applies_neither_change() { ... }
+```
+
+- `cargo test` includes the gate ([tests/requirements.rs](tests/requirements.rs)). It fails when an Active requirement verified by test has no implementation or test reference, or when a marker names an unknown requirement.
+- `just requirements` validates the requirements and renders HTML (requirements, source coverage, traceability matrix) and ReqIF to `target/requirements/`.
+
 ## Development
 
 Everything runs in a pinned environment:

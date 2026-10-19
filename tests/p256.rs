@@ -33,6 +33,7 @@ fn deployment() -> Value {
     ])
 }
 
+/// @relation(VER-006, scope=function)
 #[test]
 fn p256_signed_deployment_is_accepted_and_tampering_detected() {
     let sk = SigningKey::from_slice(&[7; 32]).unwrap();

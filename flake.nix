@@ -41,6 +41,7 @@
             pkgs.taplo
             pkgs.typos
             pkgs.reuse
+            pkgs.strictdoc
           ];
         };
       });
