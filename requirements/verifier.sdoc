@@ -44,8 +44,8 @@ ELEMENTS:
   - TITLE: RATIONALE
     TYPE: String
     REQUIRED: False
-  - TITLE: DERIVED_FROM
-    HUMAN_TITLE: Derived from (design principles, docs/04)
+  - TITLE: SATISFIES
+    HUMAN_TITLE: Satisfies (system requirements, weft-design)
     TYPE: String
     REQUIRED: False
   - TITLE: STANDARDS
@@ -64,7 +64,7 @@ ELEMENTS:
 STATEMENT: >>>
 Component requirements of weft-verifier. Each requirement is traced to the code that implements it and to the tests that verify it by @relation markers in src/ and tests/. The gate in tests/requirements.rs fails when an Active requirement verified by Test has no implementation or no test reference, or when a marker names an unknown requirement.
 
-STANDARDS is a draft mapping to IEC 62443-4-2 component requirements (CR) and CRA Annex I; it has not been reviewed by an assessor. DERIVED_FROM refers to principles D1-D9 of the design repository. FACTS refers to entries of facts.toml in the design repository.
+STANDARDS is a draft mapping to IEC 62443-4-2 component requirements (CR) and CRA Annex I; it has not been reviewed by an assessor. SATISFIES names the system requirements (weft-design/requirements/system.sdoc) a requirement refines; weft-design's `just check` verifies these references. FACTS refers to entries of facts.toml in the design repository.
 <<<
 
 [[SECTION]]
@@ -81,7 +81,7 @@ The verifier shall reject every input that is not deterministic CBOR (RFC 8949 Â
 RATIONALE: >>>
 One encoding per value makes signatures and digests unambiguous and removes parser differentials.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 3.5; CRA Annex I Part I 2(f), 2(j)
 
 [REQUIREMENT]
@@ -95,7 +95,7 @@ The verifier shall enforce limits on input size, nesting depth and item count, a
 RATIONALE: >>>
 Hostile inputs must not exhaust memory or stack on small devices.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 7.1, CR 7.2; CRA Annex I Part I 2(h)
 FACTS: verifier.cbor.max_len, verifier.cbor.max_depth, verifier.cbor.max_items
 
@@ -110,7 +110,7 @@ The encoder shall produce deterministic CBOR (map keys sorted by their encoding)
 RATIONALE: >>>
 Tools that sign documents and devices that verify them must agree byte for byte.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 3.4
 
 [REQUIREMENT]
@@ -124,7 +124,7 @@ The verifier shall accept only COSE_Sign1 messages whose unprotected header is e
 RATIONALE: >>>
 Unprotected or extra header fields could change meaning without being signed.
 <<<
-DERIVED_FROM: D6, D9
+SATISFIES: SYS-001, SYS-016, SYS-042
 STANDARDS: IEC 62443-4-2 CR 3.4, CR 3.5; CRA Annex I Part I 2(f)
 
 [REQUIREMENT]
@@ -138,7 +138,7 @@ The verifier shall reject documents with unknown fields, missing required fields
 RATIONALE: >>>
 Fields a device ignores but an authoring tool shows are a classic source of confusion attacks.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 3.5; CRA Annex I Part I 2(j)
 FACTS: verifier.format_version
 
@@ -158,7 +158,7 @@ The verifier shall accept a document only if its signature verifies with the sel
 RATIONALE: >>>
 Integrity of every document rests on this check.
 <<<
-DERIVED_FROM: D3, D6
+SATISFIES: SYS-001, SYS-021, SYS-042
 STANDARDS: IEC 62443-4-2 CR 1.9, CR 3.4; CRA Annex I Part I 2(f)
 FACTS: verifier.alg.ed25519, verifier.alg.es256
 
@@ -173,7 +173,7 @@ Key ids shall be computed from the public key. A key id in a document only selec
 RATIONALE: >>>
 A document must not be able to claim another key's identity.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-001
 STANDARDS: IEC 62443-4-2 CR 1.9
 FACTS: verifier.key_id_len, verifier.key_id_domain
 
@@ -188,7 +188,7 @@ All authority shall derive from the configured trust anchors. Without trust anch
 RATIONALE: >>>
 Deny by default; no implicit trust in servers or paths.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-001, SYS-002
 STANDARDS: IEC 62443-4-2 CR 1.9, CR 2.1; CRA Annex I Part I 2(d)
 
 [REQUIREMENT]
@@ -202,7 +202,7 @@ The effective rights of a delegated key shall be the intersection of its issuer'
 RATIONALE: >>>
 Narrowing by construction: no delegation can grant more than its issuer has.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-014
 STANDARDS: IEC 62443-4-2 CR 2.1; CRA Annex I Part I 2(d)
 
 [REQUIREMENT]
@@ -216,7 +216,7 @@ Rights shall only be used within their validity window, evaluated against the tr
 RATIONALE: >>>
 Limits the damage of leaked or forgotten keys without needing online checks.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-007, SYS-014
 STANDARDS: IEC 62443-4-2 CR 1.9
 
 [REQUIREMENT]
@@ -230,7 +230,7 @@ Documents for another tenant, and keys rooted in another tenant's anchors, shall
 RATIONALE: >>>
 One device may only obey its own tenant.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-001
 STANDARDS: IEC 62443-4-2 CR 2.1; CRA Annex I Part I 2(d)
 
 [REQUIREMENT]
@@ -244,7 +244,7 @@ Only trust anchors shall revoke keys. A revoked key shall be rejected permanentl
 RATIONALE: >>>
 Revocation is monotonic and coordination-free (CALM).
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-015
 STANDARDS: IEC 62443-4-2 CR 1.9; CRA Annex I Part I 2(d)
 
 [REQUIREMENT]
@@ -258,7 +258,7 @@ Delegation chains longer than the maximum depth, and keys with more rights sets 
 RATIONALE: >>>
 Bounds work per step on small devices. Implemented; dedicated test still missing.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 7.2
 FACTS: verifier.max_chain_depth, verifier.max_rights_per_key
 
@@ -278,7 +278,7 @@ Among authorized documents for the same component, a higher priority shall win; 
 RATIONALE: >>>
 Precedence is a plain number; names belong to the tenant's scope profile.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-010
 STANDARDS: IEC 62443-4-2 CR 2.1
 FACTS: priority.default.fleet, priority.default.group, priority.default.site, priority.default.device, priority.default.local
 
@@ -293,7 +293,7 @@ When different issuers change the same configuration path, or a path and its sub
 RATIONALE: >>>
 No hidden tie-breaking: an arbitrary winner would be silent data loss.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-011
 STANDARDS: IEC 62443-4-2 CR 3.6
 
 [REQUIREMENT]
@@ -307,7 +307,7 @@ A locked field shall only be changed by its lock owners or by keys holding the l
 RATIONALE: >>>
 Lets lower levels protect critical values (e.g. grid codes, safety limits).
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-011
 STANDARDS: IEC 62443-4-2 CR 2.1
 
 [REQUIREMENT]
@@ -321,7 +321,7 @@ When different issuers deploy different artifacts for the same component at the 
 RATIONALE: >>>
 Fail safe: keep what runs instead of guessing.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-011
 STANDARDS: IEC 62443-4-2 CR 3.6
 
 [REQUIREMENT]
@@ -335,7 +335,7 @@ Every conflict shall be reported with an id that depends only on its kind, compo
 RATIONALE: >>>
 Conflicts are never silent and can be aggregated fleet-wide.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-008, SYS-011
 STANDARDS: IEC 62443-4-2 CR 2.8; CRA Annex I Part I 2(l)
 
 [[/SECTION]]
@@ -354,7 +354,7 @@ For each slot the verifier shall reject documents with a lower version than the 
 RATIONALE: >>>
 Stops replay of old, possibly vulnerable, configurations and software.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-005, SYS-012
 STANDARDS: IEC 62443-4-2 CR 3.4; CRA Annex I Part I 2(c), 2(f)
 
 [REQUIREMENT]
@@ -368,7 +368,7 @@ Two different documents with the same version for the same slot shall be rejecte
 RATIONALE: >>>
 A signer showing different devices different content is detectable.
 <<<
-DERIVED_FROM: D3
+SATISFIES: SYS-012
 STANDARDS: IEC 62443-4-2 CR 3.4
 
 [REQUIREMENT]
@@ -382,7 +382,7 @@ If an accepted document for a component is missing from the input, the verifier 
 RATIONALE: >>>
 Fail safe on missing information.
 <<<
-DERIVED_FROM: D3, D9
+SATISFIES: SYS-013
 STANDARDS: IEC 62443-4-2 CR 3.6
 
 [REQUIREMENT]
@@ -396,7 +396,7 @@ The trusted time floor shall only move forward, to the highest issued_at of acce
 RATIONALE: >>>
 Devices without a reliable clock still gain a lower bound on time.
 <<<
-DERIVED_FROM: D2
+SATISFIES: SYS-007
 STANDARDS: IEC 62443-4-2 CR 2.11
 
 [[/SECTION]]
@@ -415,7 +415,7 @@ The result of a step shall not depend on the order of the inputs.
 RATIONALE: >>>
 Devices receiving the same documents over different paths must decide the same.
 <<<
-DERIVED_FROM: D3, D4
+SATISFIES: SYS-017
 STANDARDS: IEC 62443-4-2 CR 3.6
 
 [REQUIREMENT]
@@ -429,7 +429,7 @@ The verifier shall never panic, whatever its input; every failure is a typed rej
 RATIONALE: >>>
 A crash is a denial of service and hides the reason.
 <<<
-DERIVED_FROM: D9
+SATISFIES: SYS-016
 STANDARDS: IEC 62443-4-2 CR 3.7; CRA Annex I Part I 2(h)
 
 [REQUIREMENT]
@@ -443,7 +443,7 @@ The verifier state (marks, time floor, revocations) shall round-trip through its
 RATIONALE: >>>
 Anti-rollback depends on state surviving restarts and power loss.
 <<<
-DERIVED_FROM: D2, D3
+SATISFIES: SYS-006
 STANDARDS: IEC 62443-4-2 CR 3.4
 
 [REQUIREMENT]
@@ -457,7 +457,7 @@ Documents whose selector does not match the device's labels shall be ignored, no
 RATIONALE: >>>
 Group documents travel everywhere; non-matching ones are normal traffic.
 <<<
-DERIVED_FROM: D4
+SATISFIES: SYS-021
 STANDARDS: IEC 62443-4-2 CR 2.1
 
 [REQUIREMENT]
@@ -471,7 +471,7 @@ The verifier shall not instruct an action whose result is already in place (conf
 RATIONALE: >>>
 Repeated steps must be cheap and side-effect free.
 <<<
-DERIVED_FROM: D2
+SATISFIES: SYS-002
 
 [REQUIREMENT]
 UID: VER-028
@@ -484,7 +484,7 @@ The verifier shall be no_std, contain no unsafe code and perform no I/O (no netw
 RATIONALE: >>>
 Small trusted code is easier to review and certify. Verified by #![forbid(unsafe_code)], #![no_std] and the bare-metal builds in CI (just nostd).
 <<<
-DERIVED_FROM: D8, D9
+SATISFIES: SYS-041
 STANDARDS: CRA Annex I Part I 2(j), 2(k)
 
 [[/SECTION]]

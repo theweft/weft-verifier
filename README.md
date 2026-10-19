@@ -48,7 +48,7 @@ missing (fail safe).
 
 ## Requirements and traceability
 
-Requirements live in [requirements/verifier.sdoc](requirements/verifier.sdoc) (StrictDoc format), each with a status, a verification method, the design principles it derives from, and a draft mapping to IEC 62443-4-2 and CRA Annex I.
+Requirements live in [requirements/verifier.sdoc](requirements/verifier.sdoc) (StrictDoc format), each with a status, a verification method, the system requirements it satisfies (weft-design), and a draft mapping to IEC 62443-4-2 and CRA Annex I.
 
 Code and tests point back with a doc comment on the function:
 
