@@ -23,17 +23,20 @@ test:
     cargo test --locked
     cargo test --locked --features p256
 
-# Prove the crate builds without std on a bare-metal target.
-nostd:
-    for t in thumbv7em-none-eabihf thumbv8m.main-none-eabihf riscv32imac-unknown-none-elf; do \
-        cargo build --locked --target $t && cargo build --locked --target $t --features p256 || exit 1; \
-    done
+# Prove the crate builds without std on every bare-metal target (with and without p256).
+nostd: (nostd-target "thumbv6m-none-eabi") (nostd-target "thumbv7em-none-eabihf") (nostd-target "thumbv8m.main-none-eabihf") (nostd-target "riscv32imc-unknown-none-elf") (nostd-target "riscv32imac-unknown-none-elf")
+
+[private]
+nostd-target target:
+    cargo build --locked --target {{target}}
+    cargo build --locked --target {{target}} --features p256
 
 # Builds the library for the Linux targets (no linker needed for a library).
-targets:
-    for t in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu riscv64gc-unknown-linux-gnu; do \
-        cargo build --locked --lib --target $t --all-features || exit 1; \
-    done
+targets: (lib-target "x86_64-unknown-linux-gnu") (lib-target "aarch64-unknown-linux-gnu") (lib-target "riscv64gc-unknown-linux-gnu")
+
+[private]
+lib-target target:
+    cargo build --locked --lib --target {{target}} --all-features
 
 # Licences, advisories, banned crates, allowed sources.
 deny:

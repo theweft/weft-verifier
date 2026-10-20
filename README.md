@@ -13,7 +13,8 @@ step(state, trust anchors, device facts, raw inputs) -> (new state, decisions)
 - **No I/O.** No network, files, clock, randomness or global state. The shell feeds bytes in and
   executes the returned instructions.
 - **`no_std` + `alloc`.** The same code runs on Linux and microcontrollers. CI builds it for
-  x86-64, arm64 and riscv64 Linux, Cortex-M4F/M7, Cortex-M33 and RISC-V MCUs (e.g., ESP32-C3/C6).
+  x86-64, arm64 and riscv64 Linux, Cortex-M0/M0+, Cortex-M4F/M7, Cortex-M33, and RISC-V MCUs with
+  and without atomics (e.g., ESP32-C3, ESP32-C6).
 - **Deny by default.** Malformed, unsigned, unauthorized, expired, rolled-back or equivocating
   documents have no effect.
 - **Order independent.** Inputs are deduplicated and sorted by digest; tests check all
