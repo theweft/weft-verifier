@@ -56,10 +56,10 @@ licenses:
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps --all-features
 
-# Everything CI checks.
 # Validates requirements/*.sdoc and renders requirements, traceability and ReqIF to target/requirements.
 # The coverage gate itself runs as a test (tests/requirements.rs).
 requirements:
     strictdoc export . --formats=html,reqif-sdoc --output-dir target/requirements
 
+# Everything CI checks.
 ci: fmt-check clippy test nostd targets deny licenses typos doc requirements

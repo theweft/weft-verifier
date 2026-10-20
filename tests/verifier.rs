@@ -823,10 +823,37 @@ fn revocation_removes_a_key_permanently() {
         &[deleg.clone(), revoke, doc.clone()],
     );
     assert_eq!(reason_of(&d, &doc), Some(Reason::Revoked));
+    // The delegation to the revoked key is reported as such, not as unauthorized.
+    assert_eq!(reason_of(&d, &deleg), Some(Reason::Revoked));
     assert!(state.revoked.contains(&admin.pk.key_id()));
     // Even without the revocation document, the key stays revoked.
     let (_, d) = run(&state, &[anchor(&root)], &facts(&[]), &[deleg, doc.clone()]);
     assert_eq!(reason_of(&d, &doc), Some(Reason::Revoked));
+}
+
+/// @relation(VER-012, scope=function)
+#[test]
+fn revoked_only_with_a_valid_signature_of_the_revoked_key() {
+    let root = key(1);
+    let admin = key(2);
+    let deleg = sign(&root, &delegation(&admin, &Grant::default()));
+    let revoke = sign(&root, &revocation(&admin));
+    let doc = sign(&admin, &config(&frag("site", "app", 1, Value::map([]))));
+    let mut forged = doc.clone();
+    let last = forged.len() - 1;
+    forged[last] ^= 1;
+    let (state, d) = run(
+        &VerifierState::default(),
+        &[anchor(&root)],
+        &facts(&[]),
+        &[deleg.clone(), revoke, doc.clone(), forged.clone()],
+    );
+    assert_eq!(reason_of(&d, &doc), Some(Reason::Revoked));
+    // Claims the revoked key, but its signature does not verify: forged, not revoked.
+    assert_eq!(reason_of(&d, &forged), Some(Reason::BadSignature));
+    // Without the delegation, the revoked key is unknown and its signature cannot be checked.
+    let (_, d) = run(&state, &[anchor(&root)], &facts(&[]), &[doc.clone()]);
+    assert_eq!(reason_of(&d, &doc), Some(Reason::UnknownSigner));
 }
 
 /// @relation(VER-012, scope=function)

@@ -239,7 +239,7 @@ STATUS: Active
 VERIFICATION: Test
 TITLE: Revocation
 STATEMENT: >>>
-Only trust anchors shall revoke keys. A revoked key shall be rejected permanently, including in delegation chains.
+Only trust anchors shall revoke keys. A revoked key shall be rejected permanently, including in delegation chains. A document shall be reported as revoked only if its signature verifies with the revoked key; a document that only claims a revoked key id is reported as a bad signature or an unknown signer.
 <<<
 RATIONALE: >>>
 Revocation is monotonic and coordination-free (CALM).

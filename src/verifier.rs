@@ -118,7 +118,7 @@ pub enum Reason {
     Malformed,
     /// Signed by a key that has no rights here.
     UnknownSigner,
-    /// Signed by a revoked key, or delegates to one.
+    /// Validly signed by a key that is now revoked, or a valid delegation to one.
     Revoked,
     /// Signature does not verify, or algorithm does not match the key.
     BadSignature,
@@ -190,6 +190,9 @@ struct Ctx<'f> {
     /// Highest `issued_at` among accepted documents; becomes the next time floor.
     issued_max: u64,
     withheld: BTreeSet<String>,
+    /// Public keys of revoked keys, where known (revoked anchors, and subjects of validly
+    /// signed delegations). Lets `Revoked` mean "validly signed by a revoked key".
+    revoked_keys: BTreeMap<KeyId, PublicKey>,
 }
 
 impl Ctx<'_> {
@@ -236,6 +239,7 @@ pub fn step(
         now,
         issued_max: now,
         withheld: BTreeSet::new(),
+        revoked_keys: BTreeMap::new(),
     };
     let roots: Vec<&TrustAnchor> = anchors
         .iter()
@@ -316,7 +320,9 @@ fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) 
     let mut keys = Keys::new();
     for anchor in roots {
         let id = anchor.key.key_id();
-        if !ctx.next.revoked.contains(&id) {
+        if ctx.next.revoked.contains(&id) {
+            ctx.revoked_keys.insert(id, anchor.key.clone());
+        } else {
             keys.insert(
                 id,
                 (
@@ -332,6 +338,7 @@ fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) 
         .collect();
     let mut used = BTreeSet::new();
     let mut bad = BTreeSet::new();
+    let mut to_revoked = BTreeSet::new();
     for _ in 0..MAX_CHAIN_DEPTH {
         let mut changed = false;
         for input in &delegations {
@@ -357,6 +364,11 @@ fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) 
             }
             let subject_id = subject.key_id();
             if ctx.next.revoked.contains(&subject_id) {
+                // Validly signed by a known issuer: the revoked key itself is now known.
+                to_revoked.insert(input.digest);
+                ctx.revoked_keys
+                    .entry(subject_id)
+                    .or_insert_with(|| subject.clone());
                 continue;
             }
             let derived: Vec<Rights> = issuer_rights
@@ -390,9 +402,10 @@ fn build_key_graph(ctx: &mut Ctx<'_>, roots: &[&TrustAnchor], parsed: &[Input]) 
             ctx.accept(input);
         } else if bad.contains(&input.digest) {
             ctx.reject(input.digest, Reason::BadSignature);
+        } else if to_revoked.contains(&input.digest) {
+            ctx.reject(input.digest, Reason::Revoked);
         } else {
-            let reason = signer_problem(input, &keys, &ctx.next.revoked, &ctx.facts.tenant)
-                .unwrap_or(Reason::Unauthorized);
+            let reason = signer_problem(input, &keys, ctx).unwrap_or(Reason::Unauthorized);
             ctx.reject(input.digest, reason);
         }
     }
@@ -414,7 +427,7 @@ fn authorize_documents<'a>(
             Doc::Deployment { target, .. } => (Kind::Deployment, Action::Deploy, target),
             _ => continue,
         };
-        if let Some(reason) = signer_problem(input, keys, &ctx.next.revoked, &ctx.facts.tenant) {
+        if let Some(reason) = signer_problem(input, keys, ctx) {
             ctx.reject(input.digest, reason);
             continue;
         }
@@ -671,20 +684,21 @@ fn signed_by(input: &Input, key: &PublicKey) -> bool {
 /// Classifies why an input's signer cannot act here, if it cannot.
 ///
 /// @relation(VER-011, VER-012, scope=function)
-fn signer_problem(
-    input: &Input,
-    keys: &BTreeMap<KeyId, (PublicKey, Vec<Rights>)>,
-    revoked: &BTreeSet<KeyId>,
-    tenant: &str,
-) -> Option<Reason> {
-    if input.doc.header().tenant != tenant {
+fn signer_problem(input: &Input, keys: &Keys, ctx: &Ctx<'_>) -> Option<Reason> {
+    if input.doc.header().tenant != ctx.facts.tenant {
         return Some(Reason::WrongTenant);
     }
     let Some(id) = kid_of(&input.sign1) else {
         return Some(Reason::UnknownSigner);
     };
-    if revoked.contains(&id) {
-        return Some(Reason::Revoked);
+    if ctx.next.revoked.contains(&id) {
+        // Only a valid signature by the revoked key makes this a revoked document; anything
+        // else claiming that key id is forged or unknown.
+        return Some(match ctx.revoked_keys.get(&id) {
+            Some(key) if signed_by(input, key) => Reason::Revoked,
+            Some(_) => Reason::BadSignature,
+            None => Reason::UnknownSigner,
+        });
     }
     if !keys.contains_key(&id) {
         return Some(Reason::UnknownSigner);
